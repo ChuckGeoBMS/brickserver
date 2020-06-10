@@ -408,13 +408,13 @@ INSERT INTO products (product_no, name, price) VALUES
     (3, 'Milk', 2.99);
 */
 timeseriesRouter.post('/', function(req, res) {
-	// TODO data validation!
-	let insert = "INSERT INTO timeseries (entity_id, time, value) VALUES ";
+	try {
+		let insert = "INSERT INTO timeseries (entity_id, time, value) VALUES ";
 
-    req.body.data.forEach(row => {
-    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + "), ";
-    })
-    console.log(insert.substring(0, insert.length - 2));
+	    req.body.data.forEach(row => {
+	    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + "), ";
+	    })
+	    console.log(insert.substring(0, insert.length - 2));
 
 		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
 			if (error) {
@@ -422,6 +422,9 @@ timeseriesRouter.post('/', function(req, res) {
 			}
 			res.status(200).json(results.rows)
 		})
+	} catch (e) {
+		res.status(500).json({ error: e });
+	}
 });
 
 
@@ -488,8 +491,33 @@ entitiesRouter.get('/', async function(req, res) {
 		})
 });
 
-// A POST to the root of a resource should create a new object
+// A POST to the root of a resource should create new objects
 entitiesRouter.post('/', function(req, res) {
+	try {
+		let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
+
+	    req.body.entities.forEach(row => {
+	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
+	    })
+	    console.log(insert.substring(0, insert.length - 2));
+
+		pool.query(insert.substring(0, insert.length - 2) + "RETURNING entity_id", (error, results) => {
+			if (error) {
+				throw error
+			}
+			let returnJson = { "entity_ids": [] }
+
+		    results.rows.forEach(row => {
+		        console.log("entity_id: " +  row.entity_id);
+		        returnJson.entity_ids.push(row.entity_id);
+		    })
+			res.status(200).json(returnJson);
+		})
+	} catch (e) {
+		res.status(500).json({ error: e });
+	}
+
+/*
 		pool.query(
 			'INSERT INTO entities (entity_id, type, name, relationships) VALUES (uuid_generate_v1(), $1, $2, $3) returning entity_id', 
 			[req.body.type, req.body.name, JSON.stringify(req.body.relationships)], 
@@ -499,6 +527,7 @@ entitiesRouter.post('/', function(req, res) {
 			}
 			return res.status(200).json(results.rows[0]);		
 		})
+*/
 });
 
 
