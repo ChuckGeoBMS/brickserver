@@ -420,10 +420,10 @@ timeseriesRouter.post('/', function(req, res) {
 			if (error) {
 				throw error
 			}
-			res.status(200).json(results.rows)
+			return res.status(200).json(results.rows)
 		})
 	} catch (e) {
-		res.status(500).json({ error: e });
+		return res.status(500).json({ error: e });
 	}
 });
 
@@ -452,7 +452,7 @@ timeseriesRouter.get('/:id', async function(req, res) {
 		    })
 		    console.log(returnJson);
 
-			res.status(200).json(returnJson)
+			return res.status(200).json(returnJson)
 		})
 });
 
@@ -463,7 +463,7 @@ timeseriesRouter.delete('/:id', function(req, res) {
 			if (error) {
 				throw error
 			}
-			res.status(200).json(results.rows)
+			return res.status(200).json(results.rows)
 		})
 });
 
@@ -487,7 +487,7 @@ entitiesRouter.get('/', async function(req, res) {
 		    })
 		    console.log(returnJson);
 
-			res.status(200).json(returnJson);
+			return res.status(200).json(returnJson);
 		})
 });
 
@@ -511,10 +511,10 @@ entitiesRouter.post('/', function(req, res) {
 		        console.log("entity_id: " +  row.entity_id);
 		        returnJson.entity_ids.push(row.entity_id);
 		    })
-			res.status(200).json(returnJson);
+			return res.status(200).json(returnJson);
 		})
 	} catch (e) {
-		res.status(500).json({ error: e });
+		return res.status(500).json({ error: e });
 	}
 
 /*
@@ -537,14 +537,13 @@ entitiesRouter.get('/:id', async function(req, res) {
 			if (error) {
 				throw error
 			}
-			res.status(200).json(results.rows[0])
+			return res.status(200).json(results.rows[0])
 		})
 });
 
 // A POST to the root of a resource should modify an object
 entitiesRouter.post('/:id', function(req, res) {
-	res.statusCode = 500;
-	return res.json({
+	return res.status(500).json({
 		errors: ['TBD...']
 	}); 
 });
@@ -557,7 +556,7 @@ entitiesRouter.delete('/:id', function(req, res) {
 			if (error) {
 				throw error
 			}
-			res.status(200).json(results.rows)
+			return res.status(200).json(results.rows)
 		})
 });
 
