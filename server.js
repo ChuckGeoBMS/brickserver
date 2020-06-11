@@ -364,6 +364,18 @@ equipmentRouter.delete('/:id', function(req, res) {
 app.use('/api/v1/equipment', equipmentRouter);
 */
 
+let validationError = {
+  "detail": [
+    {
+      "loc": [
+        "TBD"
+      ],
+      "msg": "TBD",
+      "type": "TBD"
+    }
+  ]
+};
+
 // Create the express router object for timeseries
 var timeseriesRouter = express.Router();
 
@@ -415,18 +427,22 @@ timeseriesRouter.post('/', function(req, res) {
 
 		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
 			if (error) {
-				throw error
+				console.log(JSON.stringify(error));
+				return res.status(500).json(validationError);
 			}
-			return res.status(200).json(results.rows)
+			console.log(JSON.stringify(results));
+
+			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records created" : "TBD" })
 		})
 	} catch (e) {
-		return res.status(500).json({ error: e });
+		return res.status(500).json(validationError);
 	}
 });
 
 
 // We specify a param in our path for the GET of a specific object
 timeseriesRouter.get('/:id', async function(req, res) {
+	try {
 		// TODO: range...
 		pool.query("SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
@@ -451,17 +467,24 @@ timeseriesRouter.get('/:id', async function(req, res) {
 
 			return res.status(200).json(returnJson)
 		})
+	} catch (e) {
+		return res.status(500).json(validationError);
+	}
 });
 
 // Delete a specific object
 timeseriesRouter.delete('/:id', function(req, res) { 
+	try {
 		// TODO: range...
 		pool.query("DELETE FROM timeseries WHERE entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
-				throw error
+				return res.status(500).json(validationError);
 			}
-			return res.status(200).json(results.rows)
+			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records deleted" : "TBD" })
 		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
 });
 
 // Attach the routers for their respective paths
@@ -472,9 +495,10 @@ var entitiesRouter = express.Router();
 
 // We specify a param in our path for the GET of all entitites
 entitiesRouter.get('/', async function(req, res) {
+	try {
 		pool.query("SELECT entity_id FROM entities", (error, results) => {
 			if (error) {
-				throw error
+				return res.status(500).json(validationError);
 			}
 
 			let returnJson = { "entity_ids": [] }
@@ -486,6 +510,9 @@ entitiesRouter.get('/', async function(req, res) {
 
 			return res.status(200).json(returnJson);
 		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
 });
 
 // A POST to the root of a resource should create new objects
@@ -498,20 +525,14 @@ entitiesRouter.post('/', function(req, res) {
 	    })
 	    console.log(insert.substring(0, insert.length - 2));
 
-		pool.query(insert.substring(0, insert.length - 2) + "RETURNING entity_id", (error, results) => {
+		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
 			if (error) {
-				throw error
+				return res.status(500).json(validationError);		
 			}
-			let returnJson = { "entity_ids": [] }
-
-		    results.rows.forEach(row => {
-		        console.log("entity_id: " +  row.entity_id);
-		        returnJson.entity_ids.push(row.entity_id);
-		    })
-			return res.status(200).json(returnJson);
+			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records created" : "TBD" })
 		})
 	} catch (e) {
-		return res.status(500).json({ error: e });
+		return res.status(500).json(validationError);		
 	}
 
 /*
@@ -530,31 +551,37 @@ entitiesRouter.post('/', function(req, res) {
 
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
+	try {
 		pool.query("SELECT * FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
-				throw error
+				return res.status(500).json(validationError);
 			}
 			return res.status(200).json(results.rows[0])
 		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
 });
 
 // A POST to the root of a resource should modify an object
 entitiesRouter.post('/:id', function(req, res) {
-	return res.status(500).json({
-		errors: ['TBD...']
-	}); 
+	return res.status(500).json(validationError);
 });
 
 
 
 // Delete a specific object
 entitiesRouter.delete('/:id', function(req, res) { 
+	try {
 		pool.query("DELETE FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
-				throw error
+				return res.status(500).json(validationError);
 			}
-			return res.status(200).json(results.rows)
+			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records deleted" : "TBD" })
 		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
 });
 
 // Attach the routers for their respective paths
