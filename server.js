@@ -55,7 +55,7 @@ const Pool = require('pg').Pool
 const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
-  database: 'brickdb',
+  database: 'brickserver',
   user: 'jason',
   password: 'koh',
 })
