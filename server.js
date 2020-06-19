@@ -521,7 +521,29 @@ entitiesRouter.post('/', function(req, res) {
 		let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
 
 	    req.body.entities.forEach(row => {
-	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
+	    	// TODO: modify relationships to key-value pair...
+	    	let kvRelationships = {};
+
+	    	row.relationships.forEach(relationship => {
+	    		let key;
+
+	    		console.log(JSON.stringify(relationship));
+
+	    		relationship.forEach(function(element, i) {
+	    			if (i === 0) {
+	    				console.log("key: " + element)
+	    				key = element;
+	    				kvRelationships[key] = [];
+	    			} else {
+	    				console.log("value: " + element);
+	    				kvRelationships[key].push(element);
+	    			}
+	    		})
+	    	})
+
+	    	console.log(JSON.stringify(kvRelationships));
+
+	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(kvRelationships) + "'), ";
 	    })
 	    console.log(insert.substring(0, insert.length - 2));
 
@@ -556,6 +578,22 @@ entitiesRouter.get('/:id', async function(req, res) {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
+
+			// create Brick Server relationships...
+			let bsRelationships = [];
+
+			for (let key in results.rows[0].relationships) {
+				let bsRelationship = [];
+
+				bsRelationship.push(key);
+				results.rows[0].relationships[key].forEach(value => {
+					bsRelationship.push(value);
+				})
+				bsRelationships.push(bsRelationship);
+			}
+			results.rows[0].relationships = bsRelationships;
+
+			// return...
 			return res.status(200).json(results.rows[0])
 		})
 	} catch (e) {
