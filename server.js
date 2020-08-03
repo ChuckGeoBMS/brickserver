@@ -171,8 +171,8 @@ async function asyncGet(url, config) {
   	return axios.get(url, config);
 }
 
-async function asyncPost(url, data) {
-	return axios.post(url, data);
+async function asyncPost(url, data, config) {
+	return axios.post(url, data, config);
 }
 
 /*
