@@ -423,9 +423,11 @@ timeseriesRouter.post('/', function(req, res) {
 	    req.body.data.forEach(row => {
 	    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + "), ";
 	    })
-	    console.log(insert.substring(0, insert.length - 2));
 
-		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
+	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_entity_id_time_key DO UPDATE SET value = EXCLUDED.value"
+	    console.log(insert);
+
+		pool.query(insert, (error, results) => {
 			if (error) {
 				console.log(JSON.stringify(error));
 				return res.status(500).json(validationError);
