@@ -445,8 +445,23 @@ timeseriesRouter.post('/', function(req, res) {
 // We specify a param in our path for the GET of a specific object
 timeseriesRouter.get('/:id', async function(req, res) {
 	try {
-		// TODO: range...
-		pool.query("SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+		let start = "2000-01-01";
+		let end = "2050-01-01";
+		let date;
+
+		if (req.query.start_time && req.query.start_time != "") {
+			start = new Date(parseInt(req.query.start_time) * 1000).toISOString();
+
+		}
+		if (req.query.end_time && req.query.end_time != "") {
+			end = new Date(parseInt(req.query.end_time) * 1000).toISOString();
+		}
+
+		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "'";
+
+		console.log(queryString);
+
+		pool.query(queryString, (error, results) => {
 			if (error) {
 				throw error
 			}
@@ -462,11 +477,8 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			}
 
 		    results.rows.forEach(row => {
-		        console.log("entity_id: " +  row.entity_id);
 		        returnJson.data.push([ row.entity_id, row.time, row.value]);
 		    })
-		    console.log(returnJson);
-
 			return res.status(200).json(returnJson)
 		})
 	} catch (e) {
