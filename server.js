@@ -457,7 +457,7 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			end = new Date(parseInt(req.query.end_time) * 1000).toISOString();
 		}
 
-		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "'";
+		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' ORDER BY time";
 
 		console.log(queryString);
 
