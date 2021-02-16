@@ -418,13 +418,19 @@ INSERT INTO products (product_no, name, price) VALUES
 */
 timeseriesRouter.post('/', function(req, res) {
 	try {
-		let insert = "INSERT INTO timeseries (entity_id, time, value) VALUES ";
+		let prediction = null;
+		let insert = "INSERT INTO timeseries (entity_id, time, value, prediction) VALUES ";
 
+		if (req.query.prediction && req.query.prediction != "") {
+			prediction = req.query.prediction;
+		}
+
+		let predictionString = prediction == null ? "null" : "'" + prediction + "'";
 	    req.body.data.forEach(row => {
-	    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + "), ";
+	    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + predictionString + "), ";
 	    })
 
-	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_entity_id_time_key DO UPDATE SET value = EXCLUDED.value"
+	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_entity_id_time_prediction_key DO UPDATE SET value = EXCLUDED.value"
 	    console.log(insert);
 
 		pool.query(insert, (error, results) => {
@@ -447,6 +453,7 @@ timeseriesRouter.get('/:id', async function(req, res) {
 	try {
 		let start = "2000-01-01";
 		let end = "2050-01-01";
+		let prediction = null;
 		let date;
 
 		if (req.query.start_time && req.query.start_time != "") {
@@ -456,8 +463,12 @@ timeseriesRouter.get('/:id', async function(req, res) {
 		if (req.query.end_time && req.query.end_time != "") {
 			end = new Date(parseInt(req.query.end_time) * 1000).toISOString();
 		}
+		if (req.query.prediction && req.query.prediction != "") {
+			prediction = req.query.prediction;
+		}
 
-		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' ORDER BY time";
+		let predictionString = prediction == null ? "IS null" : "= '" + prediction + "'";
+		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' AND prediction " + predictionString + " ORDER BY time";
 
 		console.log(queryString);
 
