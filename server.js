@@ -474,9 +474,12 @@ timeseriesRouter.get('/:id', async function(req, res) {
 
 		pool.query(queryString, (error, results) => {
 			if (error) {
-				throw error
+				return res.status(500).json(validationError);
 			}
-
+			if (results.rowCount == 0) {
+				return res.status(404).json(validationError);
+			}
+			
 			let returnJson = {
 			    "data": [
 			    ],
@@ -486,7 +489,6 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			        "number"
 			    ]
 			}
-
 		    results.rows.forEach(row => {
 		        returnJson.data.push([ row.entity_id, row.time, row.value]);
 		    })
@@ -602,6 +604,9 @@ entitiesRouter.get('/:id', async function(req, res) {
 		pool.query("SELECT * FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
+			}
+			if (results.rowCount == 0) {
+				return res.status(404).json(validationError);
 			}
 
 			// create Brick Server relationships...
