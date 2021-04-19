@@ -547,13 +547,33 @@ entitiesRouter.get('/', async function(req, res) {
 // A POST to the root of a resource should create new objects
 entitiesRouter.post('/', function(req, res) {
 	try {
-		let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
+		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
+		let insert = "INSERT INTO entities (entity_id, name, type) VALUES ";
+		let insert2 = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
 
 	    req.body.entities.forEach(row => {
 			// TODO: put relationships in relationships table...
-	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
+	    	// insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
+	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
+	    	row.relationships.forEach(function(item) {
+
+  				// console.log(JSON.stringify(item));
+
+  				if (item.length < 2) {
+  					return res.status(400).json(validationError);
+  				}
+
+  				// TODO: need to implement inverse relationship check...
+  				let relationship = item[0];
+
+  				for (let i = 1; i < item.length; i++) {
+  					insert2 += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
+  				}
+			});
 	    })
+
 	    console.log(insert.substring(0, insert.length - 2));
+		console.log(insert2.substring(0, insert2.length - 2));
 
 		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
 			if (error) {
@@ -562,6 +582,9 @@ entitiesRouter.post('/', function(req, res) {
 			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records created" : "TBD" })
 		})
 	} catch (e) {
+
+		console.log("catch(e): " + e);
+
 		return res.status(500).json(validationError);		
 	}
 });
