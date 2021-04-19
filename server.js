@@ -574,12 +574,54 @@ entitiesRouter.post('/', function(req, res) {
 
 	    console.log(insert.substring(0, insert.length - 2));
 		console.log(insert2.substring(0, insert2.length - 2));
-
+/*
 		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);		
 			}
 			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records created" : "TBD" })
+		})
+*/
+		pool.connect((err, client, done) => {
+		  const shouldAbort = err => {
+		    if (err) {
+		      console.error('Error in transaction', err.stack)
+		      client.query('ROLLBACK', err => {
+		        if (err) {
+		          console.error('Error rolling back client', err.stack)
+		        }
+		        // release the client back to the pool
+		        done()
+		      })
+		    }
+		    return !!err
+		  }
+		  client.query('BEGIN', err => {
+		    if (shouldAbort(err)) 
+		    	return res.status(500).json(validationError);
+		    
+		    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
+
+		    client.query(/*queryText, ['brianc']*/ (insert.substring(0, insert.length - 2)), (err, res2) => {
+		      if (shouldAbort(err)) 
+		      	return res.status(500).json(validationError);
+
+		      // const insertPhotoText = 'INSERT INTO photos(user_id, photo_url) VALUES ($1, $2)'
+		      // const insertPhotoValues = [res.rows[0].id, 's3.bucket.foo']
+
+		      client.query(/*insertPhotoText, insertPhotoValues*/ (insert2.substring(0, insert2.length - 2)), (err, res2) => {
+		        if (shouldAbort(err)) 
+		        	return res.status(500).json(validationError);
+		        client.query('COMMIT', err => {
+		          if (err) {
+		            console.error('Error committing transaction', err.stack)
+		          }
+		          done()
+		          return res.status(200).json({"hello": "world"});
+		        })
+		      })
+		    })
+		  })
 		})
 	} catch (e) {
 
