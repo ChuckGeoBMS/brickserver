@@ -1,3 +1,5 @@
+// TODO: need an 
+
 const axios = require('axios');
 
 
@@ -548,29 +550,8 @@ entitiesRouter.post('/', function(req, res) {
 		let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
 
 	    req.body.entities.forEach(row => {
-	    	// TODO: modify relationships to key-value pair...
-	    	let kvRelationships = {};
-
-	    	row.relationships.forEach(relationship => {
-	    		let key;
-
-	    		console.log(JSON.stringify(relationship));
-
-	    		relationship.forEach(function(element, i) {
-	    			if (i === 0) {
-	    				console.log("key: " + element)
-	    				key = element;
-	    				kvRelationships[key] = [];
-	    			} else {
-	    				console.log("value: " + element);
-	    				kvRelationships[key].push(element);
-	    			}
-	    		})
-	    	})
-
-	    	console.log(JSON.stringify(kvRelationships));
-
-	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(kvRelationships) + "'), ";
+			// TODO: put relationships in relationships table...
+	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
 	    })
 	    console.log(insert.substring(0, insert.length - 2));
 
@@ -583,18 +564,6 @@ entitiesRouter.post('/', function(req, res) {
 	} catch (e) {
 		return res.status(500).json(validationError);		
 	}
-
-/*
-		pool.query(
-			'INSERT INTO entities (entity_id, type, name, relationships) VALUES (uuid_generate_v1(), $1, $2, $3) returning entity_id', 
-			[req.body.type, req.body.name, JSON.stringify(req.body.relationships)], 
-			(error, results) => {
-			if (error) {
-				throw error
-			}
-			return res.status(200).json(results.rows[0]);		
-		})
-*/
 });
 
 
@@ -608,22 +577,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 			if (results.rowCount == 0) {
 				return res.status(404).json(validationError);
 			}
-
-			// create Brick Server relationships...
-			let bsRelationships = [];
-
-			for (let key in results.rows[0].relationships) {
-				let bsRelationship = [];
-
-				bsRelationship.push(key);
-				results.rows[0].relationships[key].forEach(value => {
-					bsRelationship.push(value);
-				})
-				bsRelationships.push(bsRelationship);
-			}
-			results.rows[0].relationships = bsRelationships;
-
-			// return...
+			// TODO: get relationships from relationships table...
 			return res.status(200).json(results.rows[0])
 		})
 	} catch (e) {
@@ -631,11 +585,36 @@ entitiesRouter.get('/:id', async function(req, res) {
 	}
 });
 
-// A POST to the root of a resource should modify an object
-entitiesRouter.post('/:id', function(req, res) {
-	return res.status(500).json(validationError);
-});
+// A PUT to the root of a resource should modify an object
+entitiesRouter.put('/:id', function(req, res) {
+	try {
+		let set = "";
 
+		// check existence of columns...
+		if (req.body.type != null) {
+			set = "type='" + req.body.type + "'";
+		}
+		if (req.body.name != null) {
+			set += (set.length == 0 ? "" : ", ") + "name='" + req.body.name + "'";
+		}
+
+		// TODO: update relationships table...
+		if (req.body.relationships != null) {
+			set += (set.length ==0 ? "" : ", ") + "relationships='" + JSON.stringify(req.body.relationships) + "'";
+		}
+
+		console.log("UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'");
+
+		pool.query("UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+			if (error) {
+				return res.status(500).json(validationError);		
+			}
+			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records modified" : "TBD" })
+		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
+});
 
 
 // Delete a specific object
