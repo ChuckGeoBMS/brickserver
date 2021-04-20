@@ -635,15 +635,42 @@ entitiesRouter.post('/', function(req, res) {
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
 	try {
-		pool.query("SELECT * FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+		// pool.query("SELECT * FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+		pool.query("SELECT entities.entity_id, entities.type, entities.name, relationships.source_entity_id, relationships.relationship, relationships.target_entity_id FROM entities, relationships where entities.entity_id='" + req.params.id + "' AND (entities.entity_id = relationships.source_entity_id OR entities.entity_id = target_entity_id) ORDER BY relationships.relationship", (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
 			if (results.rowCount == 0) {
 				return res.status(404).json(validationError);
 			}
-			// TODO: get relationships from relationships table...
-			return res.status(200).json(results.rows[0])
+			
+			console.log(results.rows);
+
+			let entity = { "entity_id": results.rows[0].entity_id, "type": results.rows[0].type, "name": results.rows[0].name };
+
+			entity.relationships = [];
+
+			let relationshipName = "";
+			let relationshipArray = [];
+
+			results.rows.forEach(function(item) {
+				let newRelationshipName = (item.source_entity_id == results.rows[0].entity_id ? item.relationship : "~" + item.relationship);
+
+				if (relationshipName != newRelationshipName) {
+					if (relationshipArray.length != 0) {
+						entity.relationships.push(relationshipArray);
+					}
+					relationshipName = newRelationshipName;
+					relationshipArray = [ relationshipName ];
+				}
+				relationshipArray.push((item.source_entity_id == results.rows[0].entity_id ? item.target_entity_id : item.source_entity_id));
+			});
+			if (relationshipArray.length != 0) {
+				entity.relationships.push(relationshipArray);
+			}
+
+			// return res.status(200).json(results.rows[0])
+			return res.status(200).json(entity)
 		})
 	} catch (e) {
 		return res.status(500).json(validationError);		
