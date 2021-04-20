@@ -548,13 +548,13 @@ entitiesRouter.get('/', async function(req, res) {
 entitiesRouter.post('/', function(req, res) {
 	try {
 		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
-		let insert = "INSERT INTO entities (entity_id, name, type) VALUES ";
-		let insert2 = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+		let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
+		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
 
 	    req.body.entities.forEach(row => {
 			// TODO: put relationships in relationships table...
 	    	// insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
-	    	insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
+	    	insertEntities += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
 	    	row.relationships.forEach(function(item) {
 
   				// console.log(JSON.stringify(item));
@@ -567,13 +567,13 @@ entitiesRouter.post('/', function(req, res) {
   				let relationship = item[0];
 
   				for (let i = 1; i < item.length; i++) {
-  					insert2 += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
+  					insertRelationships += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
   				}
 			});
 	    })
 
-	    console.log(insert.substring(0, insert.length - 2));
-		console.log(insert2.substring(0, insert2.length - 2));
+	    console.log(insertEntities.substring(0, insertEntities.length - 2));
+		console.log(insertRelationships.substring(0, insertRelationships.length - 2));
 /*
 		pool.query(insert.substring(0, insert.length - 2), (error, results) => {
 			if (error) {
@@ -602,14 +602,14 @@ entitiesRouter.post('/', function(req, res) {
 		    
 		    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
 
-		    client.query(/*queryText, ['brianc']*/ (insert.substring(0, insert.length - 2)), (err, res2) => {
+		    client.query(/*queryText, ['brianc']*/ (insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
 		      if (shouldAbort(err)) 
 		      	return res.status(500).json(validationError);
 
 		      // const insertPhotoText = 'INSERT INTO photos(user_id, photo_url) VALUES ($1, $2)'
 		      // const insertPhotoValues = [res.rows[0].id, 's3.bucket.foo']
 
-		      client.query(/*insertPhotoText, insertPhotoValues*/ (insert2.substring(0, insert2.length - 2)), (err, res2) => {
+		      client.query(/*insertPhotoText, insertPhotoValues*/ (insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
 		        if (shouldAbort(err)) 
 		        	return res.status(500).json(validationError);
 		        client.query('COMMIT', err => {
@@ -617,6 +617,7 @@ entitiesRouter.post('/', function(req, res) {
 		            console.error('Error committing transaction', err.stack)
 		          }
 		          done()
+		          // TODO...
 		          return res.status(200).json({"hello": "world"});
 		        })
 		      })
@@ -635,7 +636,7 @@ entitiesRouter.post('/', function(req, res) {
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
 	try {
-		// pool.query("SELECT * FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+/*		
 		pool.query("SELECT entities.entity_id, entities.type, entities.name, relationships.source_entity_id, relationships.relationship, relationships.target_entity_id FROM entities, relationships where entities.entity_id='" + req.params.id + "' AND (entities.entity_id = relationships.source_entity_id OR entities.entity_id = target_entity_id) ORDER BY relationships.relationship", (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
@@ -672,6 +673,100 @@ entitiesRouter.get('/:id', async function(req, res) {
 			// return res.status(200).json(results.rows[0])
 			return res.status(200).json(entity)
 		})
+*/
+		pool.connect((err, client, done) => {
+		  let entity;
+		  let relationshipName;
+		  let relationshipArray;
+
+		  const shouldAbort = err => {
+		    if (err) {
+		      console.error('Error in transaction', err.stack)
+		      client.query('ROLLBACK', err => {
+		        if (err) {
+		          console.error('Error rolling back client', err.stack)
+		        }
+		        // release the client back to the pool
+		        done()
+		      })
+		    }
+		    return !!err
+		  }
+		  client.query('BEGIN', err => {
+		    if (shouldAbort(err)) 
+		    	return res.status(500).json(validationError);		    
+		    client.query("SELECT entity_id, type, name FROM entities WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
+				if (shouldAbort(err)) 
+					return res.status(500).json(validationError);
+
+				console.log(JSON.stringify(res2.rows));
+
+				entity = {
+							"entity_id": res2.rows[0].entity_id,
+							"type": res2.rows[0].type,
+							"name": res2.rows[0].name,
+							"relationships": []
+				}
+				client.query("SELECT * FROM relationships WHERE source_entity_id='" + req.params.id + "' ORDER BY relationship", (err, res2) => {
+					if (shouldAbort(err)) 
+						return res.status(500).json(validationError);
+
+					console.log(JSON.stringify(res2.rows));
+
+		  			relationshipName = "";
+		  			relationshipArray = [];
+					res2.rows.forEach(function(item) {
+						let newRelationshipName = item.relationship;
+
+						if (relationshipName != newRelationshipName) {
+							if (relationshipArray.length != 0) {
+								entity.relationships.push(relationshipArray);
+							}
+							relationshipName = newRelationshipName;
+							relationshipArray = [ relationshipName ];
+						}
+						relationshipArray.push(item.target_entity_id);
+					});
+					if (relationshipArray.length != 0) {
+						entity.relationships.push(relationshipArray);
+					}
+					client.query("SELECT * FROM relationships WHERE target_entity_id='" + req.params.id + "' ORDER BY relationship", (err, res2) => {
+						if (shouldAbort(err)) 
+							return res.status(500).json(validationError);
+
+						console.log(JSON.stringify(res2.rows));
+
+			  			relationshipName = "";
+			  			relationshipArray = [];
+						res2.rows.forEach(function(item) {
+							let newRelationshipName = "~" + item.relationship;
+
+							if (relationshipName != newRelationshipName) {
+								if (relationshipArray.length != 0) {
+									entity.relationships.push(relationshipArray);
+								}
+								relationshipName = newRelationshipName;
+								relationshipArray = [ relationshipName ];
+							}
+							relationshipArray.push(item.source_entity_id);
+						});
+						if (relationshipArray.length != 0) {
+							entity.relationships.push(relationshipArray);
+						}
+						client.query('COMMIT', err => {
+							if (err) {
+								console.error('Error committing transaction', err.stack)
+							}
+							done()
+							// TODO...
+							return res.status(200).json(entity);
+						})
+					})
+				})
+		  	})
+		  })
+		})
+
 	} catch (e) {
 		return res.status(500).json(validationError);		
 	}
@@ -690,7 +785,7 @@ entitiesRouter.put('/:id', function(req, res) {
 			set += (set.length == 0 ? "" : ", ") + "name='" + req.body.name + "'";
 		}
 
-		// TODO: update relationships table...
+/*
 		if (req.body.relationships != null) {
 			set += (set.length ==0 ? "" : ", ") + "relationships='" + JSON.stringify(req.body.relationships) + "'";
 		}
@@ -702,6 +797,64 @@ entitiesRouter.put('/:id', function(req, res) {
 				return res.status(500).json(validationError);		
 			}
 			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records modified" : "TBD" })
+		})
+*/
+
+		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+
+    	req.body.relationships.forEach(function(item) {
+			if (item.length < 2) {
+				return res.status(400).json(validationError);
+			}
+
+			// TODO: need to implement inverse relationship check...
+			let relationship = item[0];
+
+			for (let i = 1; i < item.length; i++) {
+				insertRelationships += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
+			}
+		})
+
+		console.log(insertRelationships);
+
+		pool.connect((err, client, done) => {
+		  const shouldAbort = err => {
+		    if (err) {
+		      console.error('Error in transaction', err.stack)
+		      client.query('ROLLBACK', err => {
+		        if (err) {
+		          console.error('Error rolling back client', err.stack)
+		        }
+		        // release the client back to the pool
+		        done()
+		      })
+		    }
+		    return !!err
+		  }
+		  client.query('BEGIN', err => {
+		    if (shouldAbort(err)) 
+		    	return res.status(500).json(validationError);		    
+		    client.query("UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
+				if (shouldAbort(err)) 
+					return res.status(500).json(validationError);
+				client.query("DELETE FROM relationships WHERE source_entity_id='" + req.params.id + "'", (err, res2) => {
+					if (shouldAbort(err)) 
+						return res.status(500).json(validationError);
+					client.query(insertRelationships.substring(0, insertRelationships.length - 2), (err, res2) => {
+						if (shouldAbort(err)) 
+							return res.status(500).json(validationError);
+						client.query('COMMIT', err => {
+							if (err) {
+								console.error('Error committing transaction', err.stack)
+							}
+							done()
+							// TODO...
+							return res.status(200).json({"goodbye": "world"});
+						})
+					})
+				})
+		  	})
+		  })
 		})
 	} catch (e) {
 		return res.status(500).json(validationError);		
