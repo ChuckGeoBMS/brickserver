@@ -776,6 +776,8 @@ entitiesRouter.get('/:id', async function(req, res) {
 entitiesRouter.put('/:id', function(req, res) {
 	try {
 		let set = "";
+		let insertRelationships = ""
+		let deleteId;
 
 		// check existence of columns...
 		if (req.body.type != null) {
@@ -799,24 +801,6 @@ entitiesRouter.put('/:id', function(req, res) {
 			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records modified" : "TBD" })
 		})
 */
-
-		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
-
-    	req.body.relationships.forEach(function(item) {
-			if (item.length < 2) {
-				return res.status(400).json(validationError);
-			}
-
-			// TODO: need to implement inverse relationship check...
-			let relationship = item[0];
-
-			for (let i = 1; i < item.length; i++) {
-				insertRelationships += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
-			}
-		})
-
-		console.log(insertRelationships);
-
 		pool.connect((err, client, done) => {
 		  const shouldAbort = err => {
 		    if (err) {
@@ -837,12 +821,50 @@ entitiesRouter.put('/:id', function(req, res) {
 		    client.query("UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
-				client.query("DELETE FROM relationships WHERE source_entity_id='" + req.params.id + "'", (err, res2) => {
+
+				console.log("executed: " + "UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'")
+
+				if (req.body.relationships != null) {
+					insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES ";
+			    	req.body.relationships.forEach(function(item) {
+						if (item.length < 2) {
+							return res.status(400).json(validationError);
+						}
+
+						console.log(JSON.stringify(item));
+
+						// TODO: need to implement inverse relationship check...
+						let relationship = item[0];
+
+						for (let i = 1; i < item.length; i++) {
+							insertRelationships += "('" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), ";
+						}
+					})
+			    	if (req.body.relationships.length > 0) {
+			    		insertRelationships = insertRelationships.substring(0, insertRelationships.length - 2);
+			    	} else {
+			    		insertRelationships = "SELECT";
+			    	}
+			    	deleteId = req.params.id;
+
+					console.log(insertRelationships);
+				} else {
+					insertRelationships = "SELECT"
+					deleteId = "e4948558-7694-455b-9021-878243c056a6"
+				}
+
+				client.query("DELETE FROM relationships WHERE source_entity_id='" + deleteId + "'", (err, res2) => {
 					if (shouldAbort(err)) 
 						return res.status(500).json(validationError);
-					client.query(insertRelationships.substring(0, insertRelationships.length - 2), (err, res2) => {
+
+					console.log("executed: " + "DELETE FROM relationships WHERE source_entity_id='" + req.params.id + "'")
+
+					client.query(insertRelationships, (err, res2) => {
 						if (shouldAbort(err)) 
 							return res.status(500).json(validationError);
+
+						console.log(" executed: " + insertRelationships);
+
 						client.query('COMMIT', err => {
 							if (err) {
 								console.error('Error committing transaction', err.stack)
@@ -857,6 +879,8 @@ entitiesRouter.put('/:id', function(req, res) {
 		  })
 		})
 	} catch (e) {
+		console.log(e);
+
 		return res.status(500).json(validationError);		
 	}
 });
