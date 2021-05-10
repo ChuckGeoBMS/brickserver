@@ -2,10 +2,11 @@
 
 const axios = require('axios');
 
-
 const express = require("express");
 const bodyParser = require('body-parser')
+const N3 = require('n3');
 const app = express();
+// const multer = require('multer');
 const inverseRelationships = {
 	"isAssociatedWith": "hasAssociatedTag",
 	"isControlledBy": "controls",
@@ -17,6 +18,8 @@ const inverseRelationships = {
 	"isRegulatedBy": "regulates",
 	"isTagOf": "hasTag"
 }
+
+// const upload = multer({ dest: './uploads/' });
 
 // Add headers
 app.use(function (req, res, next) {
@@ -40,8 +43,14 @@ app.use(function (req, res, next) {
 
 app.use(express.json({ limit: '50mb' }));
 app.use(bodyParser.json({ limit: '50mb' }))
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' })
-)
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }))
+
+const options = {
+  inflate: true,
+  defaultCharset: 'utf-8'
+};
+
+app.use(bodyParser.text(options));
 app.listen(process.env.PORT, () => {
  console.log("Server running on port " + process.env.PORT);
 });
@@ -554,3 +563,65 @@ entitiesRouter.delete('/:id', function(req, res) {
 
 // Attach the routers for their respective paths
 app.use('/brickapi/v1/entities', entitiesRouter);
+
+// Create the express router object for load
+var uploadRouter = express.Router();
+
+/*
+loadRouter.post('/', upload.single('file'), async function(req, res) {
+	const body = req.body;
+	let test;
+
+		try {
+			console.log(req.file.path);
+
+			test = {
+				"url": "file://" + req.file.originalname,
+				"path": req.file.path,
+			}
+
+			// TODO: process the TTL file!
+
+			return res.status(200).json({data: { "test": test}});
+		} catch (e) {
+			console.log(e.message);
+
+			res.status(typeof e.response == "undefined" ? 500 : e.response.status).send({errors: [ e.message ]})			
+		}
+});
+*/
+
+uploadRouter.post('/', function(req, res) {
+	try {
+	    	// console.log(req.body);
+
+			const parser = new N3.Parser();
+			let quads = [];
+
+			parser.parse(
+				req.body,
+			  	(error, quad, prefixes) => {
+			    	if (quad) {
+			      		console.log(quad);
+			      		
+			      		quads.push(quad);
+			    	} else {
+			      		console.log("# That's all, folks!", prefixes);
+
+			      		// console.log(JSON.stringify(quads));
+
+			      		// TODO: process the quads...
+			    	}
+			    }
+			);
+			return res.status(200).json({"hello": "world"});
+	} catch (e) {
+		console.log("catch(e): " + e);
+
+		return res.status(500).json(validationError);		
+	}
+});
+
+
+// Attach the routers for their respective paths
+app.use('/brickapi/v1/upload', uploadRouter);
