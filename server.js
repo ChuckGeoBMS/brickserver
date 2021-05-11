@@ -4,9 +4,12 @@ const axios = require('axios');
 
 const express = require("express");
 const bodyParser = require('body-parser')
-const N3 = require('n3');
 const app = express();
 // const multer = require('multer');
+// const fs = require('fs');
+// const csv = require('fast-csv');
+const { v4: uuidv4 } = require('uuid');
+const N3 = require('n3');
 const inverseRelationships = {
 	"isAssociatedWith": "hasAssociatedTag",
 	"isControlledBy": "controls",
@@ -596,21 +599,53 @@ uploadRouter.post('/', function(req, res) {
 	    	// console.log(req.body);
 
 			const parser = new N3.Parser();
-			let quads = [];
+			const store = new N3.Store();
 
 			parser.parse(
 				req.body,
 			  	(error, quad, prefixes) => {
 			    	if (quad) {
-			      		console.log(quad);
+			      		// console.log(quad);
+			      		console.log("#Adding quad...");
 			      		
-			      		quads.push(quad);
+			      		store.addQuad(quad);
 			    	} else {
-			      		console.log("# That's all, folks!", prefixes);
+			      		console.log("#That's all, folks!");
 
-			      		// console.log(JSON.stringify(quads));
+			      		let name2uuid = {};
+						let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
+						let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+						let uuid;
 
-			      		// TODO: process the quads...
+			      		// 1. instantiate the entities
+			      		(store.getQuads(null, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", null, null, null)).forEach(function(quad) {
+
+			      			// console.log(JSON.stringify(quad));
+			      			uuid = uuidv4();
+							insertEntities += "('" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "'), ";
+			      			name2uuid[quad.subject.value] = uuid;
+			      		});
+
+			      		console.log(insertEntities);
+
+			      		// 2. relationships...
+			      		(store.getQuads(null, null, null, null, null)).forEach(function(quad) {
+
+			      			// console.log(JSON.stringify(quad));
+			      			if (quad.predicate.value.includes("Brick")) {
+			      				let relationship = quad.predicate.value.split('#');
+
+			  					if (inverseRelationships[relationship[1]] != null) {
+			  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.object.value] + "'), ";		
+			  					} else {
+			  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
+			  					}	      				
+			      			}
+			      		});
+
+			      		console.log(insertRelationships);
+
+			      		// TODO: send queries!
 			    	}
 			    }
 			);
