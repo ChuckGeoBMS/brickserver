@@ -664,18 +664,15 @@ uploadRouter.post('/', function(req, res) {
 						    return !!err
 						  }
 						  client.query('BEGIN', err => {
-						    if (shouldAbort(err)) 
-						    	return res.status(500).json(validationError);
-						    
-						    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
-
+						    if (shouldAbort(err)) {
+						    	console.error('Error committing transaction', err.stack)
+						    	throw "transaction error...";
+						    }
 						    client.query(/*queryText, ['brianc']*/ (insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
-						      if (shouldAbort(err)) 
-						      	return res.status(500).json(validationError);
-
-						      // const insertPhotoText = 'INSERT INTO photos(user_id, photo_url) VALUES ($1, $2)'
-						      // const insertPhotoValues = [res.rows[0].id, 's3.bucket.foo']
-
+						      if (shouldAbort(err)) {
+						      	console.error('Error committing transaction', err.stack)
+						      	throw "transaction error...";
+						      }
 						      client.query(/*insertPhotoText, insertPhotoValues*/ (insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
 						        if (shouldAbort(err)) 
 						        	return res.status(500).json(validationError);
@@ -684,8 +681,7 @@ uploadRouter.post('/', function(req, res) {
 						            console.error('Error committing transaction', err.stack)
 						          }
 						          done()
-						          // TODO...
-						          return res.status(200).json({"hello": "world"});
+						          // return res.status(200).json({"hello": "world"});
 						        })
 						      })
 						    })
