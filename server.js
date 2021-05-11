@@ -271,7 +271,7 @@ entitiesRouter.post('/', function(req, res) {
   					return res.status(400).json(validationError);
   				}
 
-  				// TODO: need to implement inverse relationship check...
+  				// TODO: need to parse '#' in relationship
   				let relationship = item[0];
 
   				for (let i = 1; i < item.length; i++) {
@@ -406,11 +406,14 @@ entitiesRouter.get('/:id', async function(req, res) {
 			  			relationshipName = "";
 			  			relationshipArray = [];
 						res2.rows.forEach(function(item) {
-							let newRelationshipName = "~" + item.relationship;
+							let relationship = item.relationship.split("#");						
+							let newRelationshipName = "~" + relationship[1];
+
+							// TODO: parse "#" in relationship...
 
 							for(var key in inverseRelationships)
 							{
-							    if (inverseRelationships[key] == item.relationship) {
+							    if (inverseRelationships[key] == relationship[1]) {
 							         newRelationshipName = key;
 							         break;
 							     }
@@ -420,7 +423,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 									entity.relationships.push(relationshipArray);
 								}
 								relationshipName = newRelationshipName;
-								relationshipArray = [ relationshipName ];
+								relationshipArray = [ relationship[0] + "#" + relationshipName ];
 							}
 							relationshipArray.push(item.source_entity_id);
 						});
@@ -635,17 +638,59 @@ uploadRouter.post('/', function(req, res) {
 			      			if (quad.predicate.value.includes("Brick")) {
 			      				let relationship = quad.predicate.value.split('#');
 
-			  					if (inverseRelationships[relationship[1]] != null) {
-			  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.object.value] + "'), ";		
-			  					} else {
+			  					if (inverseRelationships[relationship[1]] == null) {
 			  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
+			  					} else {
+			  						insertRelationships += "('" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
 			  					}	      				
 			      			}
 			      		});
 
 			      		console.log(insertRelationships);
 
-			      		// TODO: send queries!
+			      		// 3. send...
+						pool.connect((err, client, done) => {
+						  const shouldAbort = err => {
+						    if (err) {
+						      console.error('Error in transaction', err.stack)
+						      client.query('ROLLBACK', err => {
+						        if (err) {
+						          console.error('Error rolling back client', err.stack)
+						        }
+						        // release the client back to the pool
+						        done()
+						      })
+						    }
+						    return !!err
+						  }
+						  client.query('BEGIN', err => {
+						    if (shouldAbort(err)) 
+						    	return res.status(500).json(validationError);
+						    
+						    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
+
+						    client.query(/*queryText, ['brianc']*/ (insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
+						      if (shouldAbort(err)) 
+						      	return res.status(500).json(validationError);
+
+						      // const insertPhotoText = 'INSERT INTO photos(user_id, photo_url) VALUES ($1, $2)'
+						      // const insertPhotoValues = [res.rows[0].id, 's3.bucket.foo']
+
+						      client.query(/*insertPhotoText, insertPhotoValues*/ (insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
+						        if (shouldAbort(err)) 
+						        	return res.status(500).json(validationError);
+						        client.query('COMMIT', err => {
+						          if (err) {
+						            console.error('Error committing transaction', err.stack)
+						          }
+						          done()
+						          // TODO...
+						          return res.status(200).json({"hello": "world"});
+						        })
+						      })
+						    })
+						  })
+						})
 			    	}
 			    }
 			);
