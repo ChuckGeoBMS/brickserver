@@ -323,7 +323,7 @@ entitiesRouter.post('/', function(req, res) {
 		          }
 		          done()
 		          // TODO...
-		          return res.status(200).json({"hello": "world"});
+		          return res.status(200).json({ "is_success": true, "reason": "transaction committed" });
 		        })
 		      })
 		    })
@@ -538,7 +538,7 @@ entitiesRouter.put('/:id', function(req, res) {
 							}
 							done()
 							// TODO...
-							return res.status(200).json({"goodbye": "world"});
+							return res.status(200).json({ "is_success": true, "reason": "transaction committed" });
 						})
 					})
 				})
@@ -597,14 +597,17 @@ loadRouter.post('/', upload.single('file'), async function(req, res) {
 });
 */
 
-uploadRouter.post('/', function(req, res) {
+uploadRouter.post('/', async function(req, res) {
 	try {
 	    	// console.log(req.body);
 
 			const parser = new N3.Parser();
 			const store = new N3.Store();
 
-			parser.parse(
+			let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
+			let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+
+			await parser.parse(
 				req.body,
 			  	(error, quad, prefixes) => {
 			    	if (quad) {
@@ -616,8 +619,6 @@ uploadRouter.post('/', function(req, res) {
 			      		console.log("#That's all, folks!");
 
 			      		let name2uuid = {};
-						let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
-						let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
 						let uuid;
 
 			      		// 1. instantiate the entities
@@ -628,8 +629,6 @@ uploadRouter.post('/', function(req, res) {
 							insertEntities += "('" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "'), ";
 			      			name2uuid[quad.subject.value] = uuid;
 			      		});
-
-			      		console.log(insertEntities);
 
 			      		// 2. relationships...
 			      		(store.getQuads(null, null, null, null, null)).forEach(function(quad) {
@@ -645,9 +644,7 @@ uploadRouter.post('/', function(req, res) {
 			  					}	      				
 			      			}
 			      		});
-
-			      		console.log(insertRelationships);
-
+/*
 			      		// 3. send...
 						pool.connect((err, client, done) => {
 						  const shouldAbort = err => {
@@ -668,12 +665,12 @@ uploadRouter.post('/', function(req, res) {
 						    	console.error('Error committing transaction', err.stack)
 						    	throw "transaction error...";
 						    }
-						    client.query(/*queryText, ['brianc']*/ (insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
+						    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
 						      if (shouldAbort(err)) {
 						      	console.error('Error committing transaction', err.stack)
 						      	throw "transaction error...";
 						      }
-						      client.query(/*insertPhotoText, insertPhotoValues*/ (insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
+						      client.query((insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
 						        if (shouldAbort(err)) 
 						        	return res.status(500).json(validationError);
 						        client.query('COMMIT', err => {
@@ -687,11 +684,15 @@ uploadRouter.post('/', function(req, res) {
 						    })
 						  })
 						})
+*/
 			    	}
 			    }
 			);
-			return res.status(200).json({"hello": "world"});
-	} catch (e) {
+
+      		console.log(insertEntities);
+      		console.log(insertRelationships);
+
+			return res.status(200).json({ "is_success": true, "reason": "transaction committed" });	} catch (e) {
 		console.log("catch(e): " + e);
 
 		return res.status(500).json(validationError);		
