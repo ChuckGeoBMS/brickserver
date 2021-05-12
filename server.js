@@ -644,47 +644,6 @@ uploadRouter.post('/', async function(req, res) {
 			  					}	      				
 			      			}
 			      		});
-/*
-			      		// 3. send...
-						pool.connect((err, client, done) => {
-						  const shouldAbort = err => {
-						    if (err) {
-						      console.error('Error in transaction', err.stack)
-						      client.query('ROLLBACK', err => {
-						        if (err) {
-						          console.error('Error rolling back client', err.stack)
-						        }
-						        // release the client back to the pool
-						        done()
-						      })
-						    }
-						    return !!err
-						  }
-						  client.query('BEGIN', err => {
-						    if (shouldAbort(err)) {
-						    	console.error('Error committing transaction', err.stack)
-						    	throw "transaction error...";
-						    }
-						    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
-						      if (shouldAbort(err)) {
-						      	console.error('Error committing transaction', err.stack)
-						      	throw "transaction error...";
-						      }
-						      client.query((insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
-						        if (shouldAbort(err)) 
-						        	return res.status(500).json(validationError);
-						        client.query('COMMIT', err => {
-						          if (err) {
-						            console.error('Error committing transaction', err.stack)
-						          }
-						          done()
-						          // return res.status(200).json({"hello": "world"});
-						        })
-						      })
-						    })
-						  })
-						})
-*/
 			    	}
 			    }
 			);
@@ -692,10 +651,48 @@ uploadRouter.post('/', async function(req, res) {
       		console.log(insertEntities);
       		console.log(insertRelationships);
 
-			return res.status(200).json({ "is_success": true, "reason": "transaction committed" });	} catch (e) {
-		console.log("catch(e): " + e);
+      		// 3. send...
+			pool.connect((err, client, done) => {
+			  const shouldAbort = err => {
+			    if (err) {
+			      console.error('Error in transaction', err.stack)
+			      client.query('ROLLBACK', err => {
+			        if (err) {
+			          console.error('Error rolling back client', err.stack)
+			        }
+			        // release the client back to the pool
+			        done()
+			      })
+			    }
+			    return !!err
+			  }
+			  client.query('BEGIN', err => {
+			    if (shouldAbort(err)) {
+			    	return res.status(422).json(validationError);
+			    }
+			    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
+			      if (shouldAbort(err)) {
+			      	return res.status(422).json(validationError);
+			      }
+			      client.query((insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
+			        if (shouldAbort(err)) 
+			        	return res.status(422).json(validationError);
+			        client.query('COMMIT', err => {
+			          if (err) {
+			            return res.status(422).json(validationError);
+			          }
+			          done()
+			          return res.status(200).json({ "is_success": true, "reason": "transaction committed" });
+			        })
+			      })
+			    })
+			  })
+			})
+			// return res.status(200).json({ "is_success": true, "reason": "transaction committed" });	
+		} catch (e) {
+			console.log("catch(e): " + e);
 
-		return res.status(500).json(validationError);		
+			return res.status(422).json(validationError);		
 	}
 });
 
