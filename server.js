@@ -47,13 +47,7 @@ app.use(function (req, res, next) {
 app.use(express.json({ limit: '50mb' }));
 app.use(bodyParser.json({ limit: '50mb' }))
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }))
-
-const options = {
-  inflate: true,
-  defaultCharset: 'utf-8'
-};
-
-app.use(bodyParser.text(options));
+app.use(bodyParser.text({ type: 'text/*', inflate: true, defaultCharset: 'utf-8', limit: '50mb' }));
 app.listen(process.env.PORT, () => {
  console.log("Server running on port " + process.env.PORT);
 });
