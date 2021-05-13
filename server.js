@@ -670,6 +670,22 @@ uploadRouter.post('/', async function(req, res) {
 			    if (shouldAbort(err)) {
 			    	return res.status(422).json(validationError);
 			    }
+
+// delete everything first...
+client.query("DELETE FROM timeseries", (err, res2) => {
+	if (shouldAbort(err)) {
+	  return res.status(422).json(validationError);
+	}
+	client.query("DELETE FROM relationships", (err, res2) => {
+		if (shouldAbort(err)) {
+	  		return res.status(422).json(validationError);
+		}
+		client.query("DELETE FROM entities", (err, res2) => {
+			if (shouldAbort(err)) {
+	  			return res.status(422).json(validationError);
+			}
+
+				// TODO: will need to reconcile existing entities...
 			    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
 			      if (shouldAbort(err)) {
 			      	return res.status(422).json(validationError);
@@ -686,6 +702,9 @@ uploadRouter.post('/', async function(req, res) {
 			        })
 			      })
 			    })
+	    })
+    })
+})
 			  })
 			})
 			// return res.status(200).json({ "is_success": true, "reason": "transaction committed" });	
