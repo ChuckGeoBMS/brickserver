@@ -567,30 +567,6 @@ app.use('/brickapi/v1/entities', entitiesRouter);
 // Create the express router object for load
 var uploadRouter = express.Router();
 
-/*
-loadRouter.post('/', upload.single('file'), async function(req, res) {
-	const body = req.body;
-	let test;
-
-		try {
-			console.log(req.file.path);
-
-			test = {
-				"url": "file://" + req.file.originalname,
-				"path": req.file.path,
-			}
-
-			// TODO: process the TTL file!
-
-			return res.status(200).json({data: { "test": test}});
-		} catch (e) {
-			console.log(e.message);
-
-			res.status(typeof e.response == "undefined" ? 500 : e.response.status).send({errors: [ e.message ]})			
-		}
-});
-*/
-
 uploadRouter.post('/', async function(req, res) {
 	try {
 	    	// console.log(req.body);
@@ -600,6 +576,8 @@ uploadRouter.post('/', async function(req, res) {
 
 			let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
 			let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+			let name2uuid = {};
+			let uuid;
 
 			await parser.parse(
 				req.body,
@@ -611,9 +589,6 @@ uploadRouter.post('/', async function(req, res) {
 			      		store.addQuad(quad);
 			    	} else {
 			      		console.log("#That's all, folks!");
-
-			      		let name2uuid = {};
-						let uuid;
 
 			      		// 1. instantiate the entities
 			      		(store.getQuads(null, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", null, null, null)).forEach(function(quad) {
@@ -692,7 +667,7 @@ client.query("DELETE FROM timeseries", (err, res2) => {
 			            return res.status(422).json(validationError);
 			          }
 			          done()
-			          return res.status(200).json({ "is_success": true, "reason": "transaction committed" });
+			          return res.status(200).json({ "is_success": true, "reason": { "status": "transaction committed", "mapping": name2uuid } });
 			        })
 			      })
 			    })
