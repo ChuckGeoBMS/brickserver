@@ -203,7 +203,23 @@ timeseriesRouter.get('/:id', async function(req, res) {
 	}
 });
 
-// Delete a specific object
+// Delete all timeseries data
+// NOTE: not part of the Brick API!
+timeseriesRouter.delete('/', function(req, res) { 
+	try {
+		// TODO: range...
+		pool.query("DELETE FROM timeseries", (error, results) => {
+			if (error) {
+				return res.status(500).json(validationError);
+			}
+			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records deleted" : "TBD" })
+		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
+});
+
+// Delete time series data for a specific entity
 timeseriesRouter.delete('/:id', function(req, res) { 
 	try {
 		// TODO: range...
@@ -546,8 +562,63 @@ entitiesRouter.put('/:id', function(req, res) {
 	}
 });
 
+// Delete all entities
+// NOTE: not part of the Brick API!
+entitiesRouter.delete('/', function(req, res) { 
+	try {
+		pool.connect((err, client, done) => {
+		  const shouldAbort = err => {
+		    if (err) {
+		      console.error('Error in transaction', err.stack)
+		      client.query('ROLLBACK', err => {
+		        if (err) {
+		          console.error('Error rolling back client', err.stack)
+		        }
+		        // release the client back to the pool
+		        done()
+		      })
+		    }
+		    return !!err
+		  }
+		  client.query('BEGIN', err => {
+		    if (shouldAbort(err)) {
+		    	return res.status(422).json(validationError);
+		    }
 
-// Delete a specific object
+			// delete everything...
+			client.query("DELETE FROM timeseries", (err, res2) => {
+				if (shouldAbort(err)) {
+				  return res.status(422).json(validationError);
+				}
+				client.query("DELETE FROM relationships", (err, res2) => {
+					if (shouldAbort(err)) {
+				  		return res.status(422).json(validationError);
+					}
+					client.query("DELETE FROM entities", (err, res2) => {
+						if (shouldAbort(err)) {
+				  			return res.status(422).json(validationError);
+						}
+				        client.query('COMMIT', err => {
+				          if (err) {
+				            return res.status(422).json(validationError);
+				          }
+				          done()
+				          return res.status(200).json({ "is_success": true, "reason": { "status": "transaction committed" } });
+				        })
+					})
+				})
+			})
+		  })
+		})
+	} catch (e) {
+		console.log("catch(e): " + e);
+
+		return res.status(500).json(validationError);		
+	}
+});
+
+// Delete a specific entity
+// TODO: delete the timeseries and relationship data associated with the entity?
 entitiesRouter.delete('/:id', function(req, res) { 
 	try {
 		pool.query("DELETE FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
