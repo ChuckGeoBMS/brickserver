@@ -121,6 +121,8 @@ INSERT INTO products (product_no, name, price) VALUES
     (3, 'Milk', 2.99);
 */
 timeseriesRouter.post('/', function(req, res) {
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
 	try {
 		let prediction = null;
 		let insert = "INSERT INTO timeseries (entity_id, time, value, prediction) VALUES ";
@@ -154,6 +156,8 @@ timeseriesRouter.post('/', function(req, res) {
 
 // We specify a param in our path for the GET of a specific object
 timeseriesRouter.get('/:id', async function(req, res) {
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
 	try {
 		let start = "2000-01-01";
 		let end = "2050-01-01";
@@ -205,10 +209,17 @@ timeseriesRouter.get('/:id', async function(req, res) {
 
 // Delete all timeseries data
 // NOTE: not part of the Brick API!
-timeseriesRouter.delete('/', function(req, res) { 
+timeseriesRouter.delete('/', function(req, res) {
 	try {
 		// TODO: range...
-		pool.query("DELETE FROM timeseries", (error, results) => {
+	 	let deleteString = 
+	 		"DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities WHERE namespace = " +
+	 		((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null") + 
+	 		")"
+
+		console.log(deleteString);	 
+
+		pool.query(deleteString, (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
@@ -242,6 +253,10 @@ var entitiesRouter = express.Router();
 
 // We specify a param in our path for the GET of all entitites
 entitiesRouter.get('/', async function(req, res) {
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
 	try {
 		pool.query("SELECT entity_id FROM entities", (error, results) => {
 			if (error) {
@@ -264,6 +279,8 @@ entitiesRouter.get('/', async function(req, res) {
 
 // A POST to the root of a resource should create new objects
 entitiesRouter.post('/', function(req, res) {
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
 	try {
 		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
 		let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
@@ -350,6 +367,8 @@ entitiesRouter.post('/', function(req, res) {
 
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
 	try {
 		pool.connect((err, client, done) => {
 		  let entity;
@@ -461,6 +480,8 @@ entitiesRouter.get('/:id', async function(req, res) {
 
 // A PUT to the root of a resource should modify an object
 entitiesRouter.put('/:id', function(req, res) {
+	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	 
 	try {
 		let set = "";
 		let insertRelationships = ""
@@ -566,6 +587,18 @@ entitiesRouter.put('/:id', function(req, res) {
 // NOTE: not part of the Brick API!
 entitiesRouter.delete('/', function(req, res) { 
 	try {
+		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
+	 	let relationshipsDeleteString = 
+	 		"DELETE from relationships WHERE " +
+	 		"source_entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ") OR " +
+	 		"target_entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
+	 	let entitiesDeleteString = "DELETE FROM entities " + whereNamespaceString
+
+	 	console.log(timeSeriesDeleteString)
+	 	console.log(relationshipsDeleteString)
+	 	console.log(entitiesDeleteString);
+
 		pool.connect((err, client, done) => {
 		  const shouldAbort = err => {
 		    if (err) {
@@ -586,15 +619,15 @@ entitiesRouter.delete('/', function(req, res) {
 		    }
 
 			// delete everything...
-			client.query("DELETE FROM timeseries", (err, res2) => {
+			client.query(timeSeriesDeleteString, (err, res2) => {
 				if (shouldAbort(err)) {
 				  return res.status(422).json(validationError);
 				}
-				client.query("DELETE FROM relationships", (err, res2) => {
+				client.query(relationshipsDeleteString, (err, res2) => {
 					if (shouldAbort(err)) {
 				  		return res.status(422).json(validationError);
 					}
-					client.query("DELETE FROM entities", (err, res2) => {
+					client.query(entitiesDeleteString, (err, res2) => {
 						if (shouldAbort(err)) {
 				  			return res.status(422).json(validationError);
 						}
@@ -618,14 +651,62 @@ entitiesRouter.delete('/', function(req, res) {
 });
 
 // Delete a specific entity
-// TODO: delete the timeseries and relationship data associated with the entity?
 entitiesRouter.delete('/:id', function(req, res) { 
 	try {
-		pool.query("DELETE FROM entities WHERE entity_id = '" + req.params.id + "'", (error, results) => {
-			if (error) {
-				return res.status(500).json(validationError);
-			}
-			return res.status(200).json({ "is_success": true, "reason": results.rowCount !== undefined ? results.rowCount + " records deleted" : "TBD" })
+	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id ='" + req.params.id + "'"
+	 	let relationshipsDeleteString = 
+	 		"DELETE from relationships WHERE " +
+	 		"source_entity_id ='" + req.params.id + "'" +  " OR " +
+	 		"target_entity_id ='" + req.params.id + "'"
+	 	let entitiesDeleteString = "DELETE FROM entities WHERE entity_id = '" + req.params.id + "'"
+
+	 	console.log(timeSeriesDeleteString)
+	 	console.log(relationshipsDeleteString)
+	 	console.log(entitiesDeleteString);
+
+		pool.connect((err, client, done) => {
+		  const shouldAbort = err => {
+		    if (err) {
+		      console.error('Error in transaction', err.stack)
+		      client.query('ROLLBACK', err => {
+		        if (err) {
+		          console.error('Error rolling back client', err.stack)
+		        }
+		        // release the client back to the pool
+		        done()
+		      })
+		    }
+		    return !!err
+		  }
+		  client.query('BEGIN', err => {
+		    if (shouldAbort(err)) {
+		    	return res.status(422).json(validationError);
+		    }
+
+			// delete everything...
+			client.query(timeSeriesDeleteString, (err, res2) => {
+				if (shouldAbort(err)) {
+				  return res.status(422).json(validationError);
+				}
+				client.query(relationshipsDeleteString, (err, res2) => {
+					if (shouldAbort(err)) {
+				  		return res.status(422).json(validationError);
+					}
+					client.query(entitiesDeleteString, (err, res2) => {
+						if (shouldAbort(err)) {
+				  			return res.status(422).json(validationError);
+						}
+				        client.query('COMMIT', err => {
+				          if (err) {
+				            return res.status(422).json(validationError);
+				          }
+				          done()
+				          return res.status(200).json({ "is_success": true, "reason": { "status": "transaction committed" } });
+				        })
+					})
+				})
+			})
+		  })
 		})
 	} catch (e) {
 		return res.status(500).json(validationError);		
@@ -640,118 +721,125 @@ var uploadRouter = express.Router();
 
 uploadRouter.post('/', async function(req, res) {
 	try {
-	    	// console.log(req.body);
+		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
+	 	let relationshipsDeleteString = 
+	 		"DELETE from relationships WHERE " +
+	 		"source_entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ") OR " +
+	 		"target_entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
+	 	let entitiesDeleteString = "DELETE FROM entities " + whereNamespaceString
 
-			const parser = new N3.Parser();
-			const store = new N3.Store();
+	 	console.log(timeSeriesDeleteString)
+	 	console.log(relationshipsDeleteString)
+	 	console.log(entitiesDeleteString);
 
-			let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
-			let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
-			let name2uuid = {};
-			let uuid;
+		const parser = new N3.Parser();
+		const store = new N3.Store();
 
-			await parser.parse(
-				req.body,
-			  	(error, quad, prefixes) => {
-			    	if (quad) {
-			      		// console.log(quad);
-			      		console.log("#Adding quad...");
-			      		
-			      		store.addQuad(quad);
-			    	} else {
-			      		console.log("#That's all, folks!");
+		let insertEntities = "INSERT INTO entities (entity_id, name, type, namespace) VALUES ";
+		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+		let name2uuid = {};
+		let uuid;
 
-			      		// 1. instantiate the entities
-			      		(store.getQuads(null, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", null, null, null)).forEach(function(quad) {
+		await parser.parse(req.body,(error, quad, prefixes) => {
+	    	if (quad) {
+	      		// console.log(quad);
+	      		console.log("#Adding quad...");
+	      		
+	      		store.addQuad(quad);
+	    	} else {
+	      		console.log("#That's all, folks!");
 
-			      			// console.log(JSON.stringify(quad));
-			      			uuid = uuidv4();
-							insertEntities += "('" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "'), ";
-			      			name2uuid[quad.subject.value] = uuid;
-			      		});
+	      		// 1. instantiate the entities
+	      		(store.getQuads(null, "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", null, null, null)).forEach(function(quad) {
 
-			      		// 2. relationships...
-			      		(store.getQuads(null, null, null, null, null)).forEach(function(quad) {
+	      			// console.log(JSON.stringify(quad));
+	      			uuid = uuidv4();
+					insertEntities += "('" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "', " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null") + "), ";
+	      			name2uuid[quad.subject.value] = uuid;
+	      		});
 
-			      			// console.log(JSON.stringify(quad));
-			      			if (quad.predicate.value.includes("Brick")) {
-			      				let relationship = quad.predicate.value.split('#');
+	      		// 2. relationships...
+	      		(store.getQuads(null, null, null, null, null)).forEach(function(quad) {
 
-			  					if (inverseRelationships[relationship[1]] == null) {
-			  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
-			  					} else {
-			  						insertRelationships += "('" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
-			  					}	      				
-			      			}
-			      		});
-			    	}
-			    }
-			);
+	      			// console.log(JSON.stringify(quad));
+	      			if (quad.predicate.value.includes("Brick")) {
+	      				let relationship = quad.predicate.value.split('#');
 
-      		console.log(insertEntities);
-      		console.log(insertRelationships);
+	  					if (inverseRelationships[relationship[1]] == null) {
+	  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
+	  					} else {
+	  						insertRelationships += "('" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
+	  					}	      				
+	      			}
+	      		});
+	    	}
+		});
 
-      		// 3. send...
-			pool.connect((err, client, done) => {
-			  const shouldAbort = err => {
-			    if (err) {
-			      console.error('Error in transaction', err.stack)
-			      client.query('ROLLBACK', err => {
-			        if (err) {
-			          console.error('Error rolling back client', err.stack)
-			        }
-			        // release the client back to the pool
-			        done()
-			      })
-			    }
-			    return !!err
-			  }
-			  client.query('BEGIN', err => {
-			    if (shouldAbort(err)) {
-			    	return res.status(422).json(validationError);
-			    }
+  		console.log(insertEntities);
+  		console.log(insertRelationships);
 
-// delete everything first...
-client.query("DELETE FROM timeseries", (err, res2) => {
-	if (shouldAbort(err)) {
-	  return res.status(422).json(validationError);
-	}
-	client.query("DELETE FROM relationships", (err, res2) => {
-		if (shouldAbort(err)) {
-	  		return res.status(422).json(validationError);
-		}
-		client.query("DELETE FROM entities", (err, res2) => {
-			if (shouldAbort(err)) {
-	  			return res.status(422).json(validationError);
-			}
+  		// 3. send...
+		pool.connect((err, client, done) => {
+		  const shouldAbort = err => {
+		    if (err) {
+		      console.error('Error in transaction', err.stack)
+		      client.query('ROLLBACK', err => {
+		        if (err) {
+		          console.error('Error rolling back client', err.stack)
+		        }
+		        // release the client back to the pool
+		        done()
+		      })
+		    }
+		    return !!err
+		  }
+		  client.query('BEGIN', err => {
+		    if (shouldAbort(err)) {
+		    	return res.status(422).json(validationError);
+		    }
 
-				// TODO: will need to reconcile existing entities...
-			    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
-			      if (shouldAbort(err)) {
-			      	return res.status(422).json(validationError);
-			      }
-			      client.query((insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
-			        if (shouldAbort(err)) 
-			        	return res.status(422).json(validationError);
-			        client.query('COMMIT', err => {
-			          if (err) {
-			            return res.status(422).json(validationError);
-			          }
-			          done()
-			          return res.status(200).json({ "is_success": true, "reason": { "status": "transaction committed", "mapping": name2uuid } });
-			        })
-			      })
+			// delete everything first...
+			client.query(timeSeriesDeleteString, (err, res2) => {
+				if (shouldAbort(err)) {
+				  return res.status(422).json(validationError);
+				}
+				client.query(relationshipsDeleteString, (err, res2) => {
+					if (shouldAbort(err)) {
+				  		return res.status(422).json(validationError);
+					}
+					client.query(entitiesDeleteString, (err, res2) => {
+						if (shouldAbort(err)) {
+				  			return res.status(422).json(validationError);
+						}
+
+						// TODO: will need to reconcile existing entities...
+					    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
+					      if (shouldAbort(err)) {
+					      	return res.status(422).json(validationError);
+					      }
+					      client.query((insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
+					        if (shouldAbort(err)) 
+					        	return res.status(422).json(validationError);
+					        client.query('COMMIT', err => {
+					          if (err) {
+					            return res.status(422).json(validationError);
+					          }
+					          done()
+					          return res.status(200).json({ "is_success": true, "reason": { "status": "transaction committed", "mapping": name2uuid } });
+					        })
+					      })
+					    })
+				    })
 			    })
-	    })
-    })
-})
-			  })
 			})
-			// return res.status(200).json({ "is_success": true, "reason": "transaction committed" });	
-		} catch (e) {
-			console.log("catch(e): " + e);
+		  })
+		})
+		// return res.status(200).json({ "is_success": true, "reason": "transaction committed" });	
+	} catch (e) {
+		console.log("catch(e): " + e);
 
-			return res.status(422).json(validationError);		
+		return res.status(422).json(validationError);		
 	}
 });
 
