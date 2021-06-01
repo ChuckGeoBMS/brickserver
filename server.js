@@ -845,4 +845,4 @@ uploadRouter.post('/', async function(req, res) {
 
 
 // Attach the routers for their respective paths
-app.use('/brickapi/v1/upload', uploadRouter);
+app.use('/brickapi/v1/entities/upload', uploadRouter);
