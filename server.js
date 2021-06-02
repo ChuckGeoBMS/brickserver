@@ -184,10 +184,11 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
+/*
 			if (results.rowCount == 0) {
 				return res.status(404).json(validationError);
 			}
-			
+*/			
 			let returnJson = {
 			    "data": [
 			    ],
@@ -253,12 +254,10 @@ var entitiesRouter = express.Router();
 
 // We specify a param in our path for the GET of all entitites
 entitiesRouter.get('/', async function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
-	 
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	console.log("namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"));
 	 
 	try {
-		pool.query("SELECT entity_id FROM entities", (error, results) => {
+		pool.query("SELECT entity_id FROM entities WHERE namespace=" + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"), (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
