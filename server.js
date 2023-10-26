@@ -121,11 +121,13 @@ INSERT INTO products (product_no, name, price) VALUES
     (3, 'Milk', 2.99);
 */
 timeseriesRouter.post('/', function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"
+
+	console.log("timeseriesRouter.post(): namespace = " + namespace);
 	 
 	try {
 		let prediction = null;
-		let insert = "INSERT INTO timeseries (entity_id, time, value, prediction) VALUES ";
+		let insert = "INSERT INTO timeseries (namespace, entity_id, time, value, prediction) VALUES ";
 
 		if (req.query.prediction && req.query.prediction != "") {
 			prediction = req.query.prediction;
@@ -133,10 +135,10 @@ timeseriesRouter.post('/', function(req, res) {
 
 		let predictionString = prediction == null ? "null" : "'" + prediction + "'";
 	    req.body.data.forEach(row => {
-	    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + predictionString + "), ";
+	    	insert += "(" + namespace + ", '" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + predictionString + "), ";
 	    })
 
-	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_entity_id_time_prediction_key DO UPDATE SET value = EXCLUDED.value"
+	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_namespace_entity_id_time_prediction_key DO UPDATE SET value = EXCLUDED.value"
 	    console.log(insert);
 
 		pool.query(insert, (error, results) => {
@@ -156,7 +158,9 @@ timeseriesRouter.post('/', function(req, res) {
 
 // We specify a param in our path for the GET of a specific object
 timeseriesRouter.get('/:id', async function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"
+
+	console.log("namespace = " + namespace);
 	 
 	try {
 		let start = "2000-01-01";
@@ -176,7 +180,7 @@ timeseriesRouter.get('/:id', async function(req, res) {
 		}
 
 		let predictionString = prediction == null ? "IS null" : "= '" + prediction + "'";
-		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' AND prediction " + predictionString + " ORDER BY time";
+		let queryString = "SELECT * FROM timeseries WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' AND prediction " + predictionString + " ORDER BY time";
 
 		console.log(queryString);
 
@@ -193,13 +197,14 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			    "data": [
 			    ],
 			    "columns": [
+			    	"namespace",
 			        "uuid",
 			        "timestamp",
 			        "number"
 			    ]
 			}
 		    results.rows.forEach(row => {
-		        returnJson.data.push([ row.entity_id, row.time, row.value]);
+		        returnJson.data.push([ row.namespace, row.entity_id, row.time, row.value]);
 		    })
 			return res.status(200).json(returnJson)
 		})
@@ -211,12 +216,12 @@ timeseriesRouter.get('/:id', async function(req, res) {
 // Delete all timeseries data
 // NOTE: not part of the Brick API!
 timeseriesRouter.delete('/', function(req, res) {
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
 	try {
-		// TODO: range...
+		// TODO: simplify, range...
 	 	let deleteString = 
-	 		"DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities WHERE namespace = " +
-	 		((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null") + 
-	 		")"
+	 		"DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities WHERE namespace = " + namespace + ")"
 
 		console.log(deleteString);	 
 
@@ -233,9 +238,11 @@ timeseriesRouter.delete('/', function(req, res) {
 
 // Delete time series data for a specific entity
 timeseriesRouter.delete('/:id', function(req, res) { 
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	
 	try {
 		// TODO: range...
-		pool.query("DELETE FROM timeseries WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+		pool.query("DELETE FROM timeseries WHERE namespace = " + namespace + "AND entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
@@ -254,10 +261,12 @@ var entitiesRouter = express.Router();
 
 // We specify a param in our path for the GET of all entitites
 entitiesRouter.get('/', async function(req, res) {
-	console.log("namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"));
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.get(): namespace = " + namespace);
 	 
 	try {
-		pool.query("SELECT entity_id FROM entities WHERE namespace=" + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"), (error, results) => {
+		pool.query("SELECT entity_id FROM entities WHERE namespace=" + namespace, (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
@@ -278,17 +287,19 @@ entitiesRouter.get('/', async function(req, res) {
 
 // A POST to the root of a resource should create new objects
 entitiesRouter.post('/', function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.post(): namespace = " + namespace);
 	 
 	try {
 		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
-		let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
-		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+		let insertEntities = "INSERT INTO entities (namespace, entity_id, name, type) VALUES ";
+		let insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES "
 
 	    req.body.entities.forEach(row => {
 			// TODO: put relationships in relationships table...
 	    	// insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
-	    	insertEntities += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
+	    	insertEntities += "(" + namespace + ", '" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
 	    	row.relationships.forEach(function(item) {
 
   				// console.log(JSON.stringify(item));
@@ -302,9 +313,9 @@ entitiesRouter.post('/', function(req, res) {
 
   				for (let i = 1; i < item.length; i++) {
   					if (inverseRelationships[relationship] != null) {
-  						insertRelationships += "('" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + row.entity_id + "'), ";
+  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + row.entity_id + "'), ";
   					} else {
-  						insertRelationships += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), "; 						
+  						insertRelationships += "(" + namespace + ", '" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), "; 						
   					}
   				}
 			});
@@ -366,7 +377,9 @@ entitiesRouter.post('/', function(req, res) {
 
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.get(id): namespace = " + namespace);
 	 
 	try {
 		pool.connect((err, client, done) => {
@@ -390,7 +403,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 		  client.query('BEGIN', err => {
 		    if (shouldAbort(err)) 
 		    	return res.status(500).json(validationError);		    
-		    client.query("SELECT entity_id, type, name FROM entities WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
+		    client.query("SELECT entity_id, type, name FROM entities WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'", (err, res2) => {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
 
@@ -402,7 +415,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 							"name": res2.rows[0].name,
 							"relationships": []
 				}
-				client.query("SELECT * FROM relationships WHERE source_entity_id='" + req.params.id + "' ORDER BY relationship", (err, res2) => {
+				client.query("SELECT * FROM relationships WHERE namespace = " + namespace + " AND source_entity_id='" + req.params.id + "' ORDER BY relationship", (err, res2) => {
 					if (shouldAbort(err)) 
 						return res.status(500).json(validationError);
 
@@ -479,7 +492,9 @@ entitiesRouter.get('/:id', async function(req, res) {
 
 // A PUT to the root of a resource should modify an object
 entitiesRouter.put('/:id', function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.put(id): namespace = " + namespace);
 	 
 	try {
 		let set = "";
@@ -511,14 +526,14 @@ entitiesRouter.put('/:id', function(req, res) {
 		  client.query('BEGIN', err => {
 		    if (shouldAbort(err)) 
 		    	return res.status(500).json(validationError);		    
-		    client.query("UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
+		    client.query("UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'", (err, res2) => {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
 
-				console.log("executed: " + "UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'")
+				console.log("executed: " + "UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'")
 
 				if (req.body.relationships != null) {
-					insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES ";
+					insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES ";
 			    	req.body.relationships.forEach(function(item) {
 						if (item.length < 2) {
 							return res.status(400).json(validationError);
@@ -531,9 +546,9 @@ entitiesRouter.put('/:id', function(req, res) {
 
 						for (let i = 1; i < item.length; i++) {
 		  					if (inverseRelationships[relationship] != null) {
-		  						insertRelationships += "('" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + req.params.id + "'), ";
+		  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + req.params.id + "'), ";
 		  					} else {
-		  						insertRelationships += "('" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), "; 						
+		  						insertRelationships += "(" + namespace + ", '" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), "; 						
 		  					}
 						}
 					})
@@ -550,11 +565,11 @@ entitiesRouter.put('/:id', function(req, res) {
 					deleteId = "e4948558-7694-455b-9021-878243c056a6"
 				}
 
-				client.query("DELETE FROM relationships WHERE source_entity_id='" + deleteId + "'", (err, res2) => {
+				client.query("DELETE FROM relationships WHERE namespace = " + namespace + " AND source_entity_id='" + deleteId + "'", (err, res2) => {
 					if (shouldAbort(err)) 
 						return res.status(500).json(validationError);
 
-					console.log("executed: " + "DELETE FROM relationships WHERE source_entity_id='" + req.params.id + "'")
+					console.log("executed: " + "DELETE FROM relationships WHERE namespace = " + namespace + " AND source_entity_id='" + req.params.id + "'")
 
 					client.query(insertRelationships, (err, res2) => {
 						if (shouldAbort(err)) 
@@ -587,6 +602,8 @@ entitiesRouter.put('/:id', function(req, res) {
 entitiesRouter.delete('/', function(req, res) { 
 	try {
 		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+		// TODO: simplify time series and relationship deletion
 	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
 	 	let relationshipsDeleteString = 
 	 		"DELETE from relationships WHERE " +
@@ -652,12 +669,15 @@ entitiesRouter.delete('/', function(req, res) {
 // Delete a specific entity
 entitiesRouter.delete('/:id', function(req, res) { 
 	try {
+		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+		// TODO: simplify time series and relationship deletion
 	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id ='" + req.params.id + "'"
 	 	let relationshipsDeleteString = 
 	 		"DELETE from relationships WHERE " +
 	 		"source_entity_id ='" + req.params.id + "'" +  " OR " +
 	 		"target_entity_id ='" + req.params.id + "'"
-	 	let entitiesDeleteString = "DELETE FROM entities WHERE entity_id = '" + req.params.id + "'"
+	 	let entitiesDeleteString = "DELETE FROM entities " + whereNamespaceString + " AND entity_id = '" + req.params.id + "'"
 
 	 	console.log(timeSeriesDeleteString)
 	 	console.log(relationshipsDeleteString)
@@ -720,7 +740,8 @@ var uploadRouter = express.Router();
 
 uploadRouter.post('/', async function(req, res) {
 	try {
-		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+		let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+		let whereNamespaceString = "WHERE namespace = " + namespace
 	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
 	 	let relationshipsDeleteString = 
 	 		"DELETE from relationships WHERE " +
@@ -735,8 +756,8 @@ uploadRouter.post('/', async function(req, res) {
 		const parser = new N3.Parser();
 		const store = new N3.Store();
 
-		let insertEntities = "INSERT INTO entities (entity_id, name, type, namespace) VALUES ";
-		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+		let insertEntities = "INSERT INTO entities (namespace, entity_id, name, type) VALUES ";
+		let insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES "
 		let name2uuid = {};
 		let uuid;
 
@@ -754,7 +775,7 @@ uploadRouter.post('/', async function(req, res) {
 
 	      			// console.log(JSON.stringify(quad));
 	      			uuid = uuidv4();
-					insertEntities += "('" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "', " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null") + "), ";
+					insertEntities += "(" + namespace + ", '" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "'), ";
 	      			name2uuid[quad.subject.value] = uuid;
 	      		});
 
@@ -766,9 +787,9 @@ uploadRouter.post('/', async function(req, res) {
 	      				let relationship = quad.predicate.value.split('#');
 
 	  					if (inverseRelationships[relationship[1]] == null) {
-	  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
+	  						insertRelationships += "(" + namespace + ", '" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
 	  					} else {
-	  						insertRelationships += "('" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
+	  						insertRelationships += "(" + namespace + ", '" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
 	  					}	      				
 	      			}
 	      		});
