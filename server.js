@@ -295,15 +295,14 @@ entitiesRouter.post('/', function(req, res) {
 		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
 		let insertEntities = "INSERT INTO entities (namespace, entity_id, name, type) VALUES ";
 		let insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES "
+		let relationshipsCount = 0
 
 	    req.body.entities.forEach(row => {
 			// TODO: put relationships in relationships table...
 	    	// insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
 	    	insertEntities += "(" + namespace + ", '" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
 	    	row.relationships.forEach(function(item) {
-
-  				// console.log(JSON.stringify(item));
-
+	    		reltionshipsCount++
   				if (item.length < 2) {
   					return res.status(400).json(validationError);
   				}
@@ -322,7 +321,7 @@ entitiesRouter.post('/', function(req, res) {
 	    })
 
 	    console.log(insertEntities.substring(0, insertEntities.length - 2));
-		console.log(insertRelationships.substring(0, insertRelationships.length - 2));
+		console.log(relationshipsCount ? insertRelationships.substring(0, insertRelationships.length - 2) : "no relationships");
 
 		pool.connect((err, client, done) => {
 		  const shouldAbort = err => {
@@ -344,14 +343,10 @@ entitiesRouter.post('/', function(req, res) {
 		    
 		    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
 
-		    client.query(/*queryText, ['brianc']*/ (insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
+		    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
 		      if (shouldAbort(err)) 
 		      	return res.status(500).json(validationError);
-
-		      // const insertPhotoText = 'INSERT INTO photos(user_id, photo_url) VALUES ($1, $2)'
-		      // const insertPhotoValues = [res.rows[0].id, 's3.bucket.foo']
-
-		      client.query(/*insertPhotoText, insertPhotoValues*/ (insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
+		      client.query(relationshipsCount ? (insertRelationships.substring(0, insertRelationships.length - 2)) : "", (err, res2) => {
 		        if (shouldAbort(err)) 
 		        	return res.status(500).json(validationError);
 		        client.query('COMMIT', err => {
