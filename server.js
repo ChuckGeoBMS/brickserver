@@ -319,19 +319,20 @@ entitiesRouter.post('/', function(req, res) {
   				}
 
   				// TODO: need to parse '#' in relationship
-  				let relationship = item[0].split("#")[1];
+  				let relationshipParts = item[0].split("#");
+
+  				if (relationshipParts.length != 2 || typeof(inverseRelationships[relationshipParts[1]]) === "undefined") {
+  					console.log("not a Brick Schema relationship")
+
+  					return res.status(500).json(validationError);	 						
+  				}
+
+  				let relationship = item[0];
+  				let inverseRelationship = relationshipParts[0] + inverseRelationships[relationshipParts[0]]
 
   				for (let i = 1; i < item.length; i++) {
-
-  					console.log("relationship: " + relationship)
-  					console.log("inverse relationship: " + inverseRelationships[relationship])
-
-  					if (inverseRelationships[relationship] != null) {
-  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + row.entity_id + "'), ";
   						insertRelationships += "(" + namespace + ", '" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), "; 						
-  					} else {
-  						return res.status(500).json(validationError);	 						
-  					}
+  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + row.entity_id + "'), ";
   				}
 			});
 	    })
