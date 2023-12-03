@@ -290,6 +290,7 @@ entitiesRouter.post('/', function(req, res) {
 	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
 
 	console.log("entitiesRouter.post(): namespace = " + namespace);
+	console.log("body = " + JSON.stringify(req.body))
 	 
 	try {
 		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
@@ -298,11 +299,9 @@ entitiesRouter.post('/', function(req, res) {
 		let relationshipsCount = 0
 
 	    req.body.entities.forEach(row => {
-			// TODO: put relationships in relationships table...
-	    	// insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
 	    	insertEntities += "(" + namespace + ", '" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
 	    	row.relationships.forEach(function(item) {
-	    		reltionshipsCount++
+	    		relationshipsCount++
   				if (item.length < 2) {
   					return res.status(400).json(validationError);
   				}
