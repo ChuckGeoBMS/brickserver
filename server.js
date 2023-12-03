@@ -20,18 +20,6 @@ const inverseRelationships = {
 	"isPointOf": "hasPoint",
 	"isRegulatedBy": "regulates",
 	"isTagOf": "hasTag",
-
-	// not very clean...
-	"hasAssociatedTag": "isAssociatedWith",
-	"controls": "isControlledBy",
-	"feeds": "isFedBy",
-	"hasLocation": "isLocationOf",
-	"measures": "isMeasuredBy",
-	"hasPart": "isPartOf",
-	"hasPoint": "isPointOf",
-	"regulates": "isRegulatedBy",
-	"hasTag": "isTagOf"
-
 }
 
 // const upload = multer({ dest: './uploads/' });
@@ -321,17 +309,19 @@ entitiesRouter.post('/', function(req, res) {
   				// TODO: need to parse '#' in relationship
   				let relationshipParts = item[0].split("#");
 
-  				if (relationshipParts.length != 2 || typeof(inverseRelationships[relationshipParts[1]]) === "undefined") {
+  				if (relationshipParts.length != 2) {
   					console.log("not a Brick Schema relationship")
 
   					return res.status(500).json(validationError);	 						
   				}
 
   				let relationship = item[0];
-  				let inverseRelationship = relationshipParts[0] + inverseRelationships[relationshipParts[0]]
+  				let inverseRelationship = typeof(inverseRelationships[relationshipParts[1]]) === "undefined" ? null : relationshipParts[0] + "#" + inverseRelationships[relationshipParts[1]]
 
   				for (let i = 1; i < item.length; i++) {
-  						insertRelationships += "(" + namespace + ", '" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), "; 						
+  					if (inverseRelationship === null)
+  						insertRelationships += "(" + namespace + ", '" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
+  					else						
   						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + row.entity_id + "'), ";
   				}
 			});
@@ -358,8 +348,6 @@ entitiesRouter.post('/', function(req, res) {
 		    if (shouldAbort(err)) 
 		    	return res.status(500).json(validationError);
 		    
-		    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
-
 		    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
 		      if (shouldAbort(err)) 
 		      	return res.status(500).json(validationError);
@@ -371,7 +359,6 @@ entitiesRouter.post('/', function(req, res) {
 		            console.error('Error committing transaction', err.stack)
 		          }
 		          done()
-		          // TODO...
 		          return res.status(200).json({ "is_success": true, "reason": "transaction committed" });
 		        })
 		      })
