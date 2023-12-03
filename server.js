@@ -498,7 +498,7 @@ entitiesRouter.put('/:id', function(req, res) {
 	try {
 		let set = "";
 		let insertRelationships = ""
-		let deleteId;
+		let deleteRelationships = ""
 
 		// check existence of columns...
 		if (req.body.type != null) {
@@ -524,14 +524,16 @@ entitiesRouter.put('/:id', function(req, res) {
 		  }
 		  client.query('BEGIN', err => {
 		    if (shouldAbort(err)) 
-		    	return res.status(500).json(validationError);		    
-		    client.query("UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'", (err, res2) => {
+		    	return res.status(500).json(validationError);
+
+			console.log("executing UPDATE: " + (set == "" ? "SELECT" : "UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'"))
+
+		    client.query(set == "" ? "SELECT" : "UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'", (err, res2) => {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
 
-				console.log("executed: " + "UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'")
-
 				if (req.body.relationships != null) {
+					deleteRelationships = "DELETE FROM relationships WHERE namespace = " + namespace + " AND (source_entity_id='" + req.params.id + "' OR target_entity_id='" + req.params.id + "')"
 					insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES ";
 			    	req.body.relationships.forEach(function(item) {
 						if (item.length < 2) {
@@ -561,21 +563,19 @@ entitiesRouter.put('/:id', function(req, res) {
 					console.log(insertRelationships);
 				} else {
 					insertRelationships = "SELECT"
-					deleteId = "e4948558-7694-455b-9021-878243c056a6"
+					deleteRelationships = "SELECT"
 				}
 
-				client.query("DELETE FROM relationships WHERE namespace = " + namespace + " AND source_entity_id='" + deleteId + "'", (err, res2) => {
+				console.log("executing DELETE: " + deleteRelationships)
+				client.query(deleteRelationships, (err, res2) => {
 					if (shouldAbort(err)) 
 						return res.status(500).json(validationError);
 
-					console.log("executed: " + "DELETE FROM relationships WHERE namespace = " + namespace + " AND source_entity_id='" + req.params.id + "'")
+					console.log("executing INSERT: " + insertRelationships);
 
 					client.query(insertRelationships, (err, res2) => {
 						if (shouldAbort(err)) 
 							return res.status(500).json(validationError);
-
-						console.log(" executed: " + insertRelationships);
-
 						client.query('COMMIT', err => {
 							if (err) {
 								console.error('Error committing transaction', err.stack)
