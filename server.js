@@ -19,7 +19,19 @@ const inverseRelationships = {
 	"isPartOf": "hasPart",
 	"isPointOf": "hasPoint",
 	"isRegulatedBy": "regulates",
-	"isTagOf": "hasTag"
+	"isTagOf": "hasTag",
+
+	// not very clean...
+	"hasAssociatedTag": "isAssociatedWith",
+	"controls": "isControlledBy",
+	"feeds": "isFedBy",
+	"hasLocation": "isLocationOf",
+	"measures": "isMeasuredBy",
+	"hasPart": "isPartOf",
+	"hasPoint": "isPointOf",
+	"regulates": "isRegulatedBy",
+	"hasTag": "isTagOf"
+
 }
 
 // const upload = multer({ dest: './uploads/' });
@@ -307,13 +319,18 @@ entitiesRouter.post('/', function(req, res) {
   				}
 
   				// TODO: need to parse '#' in relationship
-  				let relationship = item[0];
+  				let relationship = item[0].split("#")[1];
 
   				for (let i = 1; i < item.length; i++) {
+
+  					console.log("relationship: " + relationship)
+  					console.log("inverse relationship: " + inverseRelationships[relationship])
+
   					if (inverseRelationships[relationship] != null) {
   						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + row.entity_id + "'), ";
-  					} else {
   						insertRelationships += "(" + namespace + ", '" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), "; 						
+  					} else {
+  						return res.status(500).json(validationError);	 						
   					}
   				}
 			});
