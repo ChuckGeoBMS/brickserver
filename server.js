@@ -306,7 +306,6 @@ entitiesRouter.post('/', function(req, res) {
   					return res.status(400).json(validationError);
   				}
 
-  				// TODO: need to parse '#' in relationship
   				let relationshipParts = item[0].split("#");
 
   				if (relationshipParts.length != 2) {
@@ -493,7 +492,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 entitiesRouter.put('/:id', function(req, res) {
 	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
 
-	console.log("entitiesRouter.put(id): namespace = " + namespace);
+	console.log("entitiesRouter.put(" + req.params.id + "): namespace = " + namespace);
 	 
 	try {
 		let set = "";
@@ -540,18 +539,23 @@ entitiesRouter.put('/:id', function(req, res) {
 							return res.status(400).json(validationError);
 						}
 
-						console.log(JSON.stringify(item));
+		  				let relationshipParts = item[0].split("#");
 
-						// TODO: need to implement inverse relationship check...
-						let relationship = item[0];
+		  				if (relationshipParts.length != 2) {
+		  					console.log("not a Brick Schema relationship")
 
-						for (let i = 1; i < item.length; i++) {
-		  					if (inverseRelationships[relationship] != null) {
-		  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + req.params.id + "'), ";
-		  					} else {
-		  						insertRelationships += "(" + namespace + ", '" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), "; 						
-		  					}
-						}
+		  					return res.status(500).json(validationError);	 						
+		  				}
+
+		  				let relationship = item[0];
+		  				let inverseRelationship = typeof(inverseRelationships[relationshipParts[1]]) === "undefined" ? null : relationshipParts[0] + "#" + inverseRelationships[relationshipParts[1]]
+
+		  				for (let i = 1; i < item.length; i++) {
+		  					if (inverseRelationship === null)
+		  						insertRelationships += "(" + namespace + ", '" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), ";
+		  					else						
+		  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + req.params.id + "'), ";
+		  				}
 					})
 			    	if (req.body.relationships.length > 0) {
 			    		insertRelationships = insertRelationships.substring(0, insertRelationships.length - 2);
