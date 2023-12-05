@@ -197,14 +197,13 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			    "data": [
 			    ],
 			    "columns": [
-			    	"namespace",
 			        "uuid",
 			        "timestamp",
 			        "number"
 			    ]
 			}
 		    results.rows.forEach(row => {
-		        returnJson.data.push([ row.namespace, row.entity_id, row.time, row.value]);
+		        returnJson.data.push([row.entity_id, row.time, row.value]);
 		    })
 			return res.status(200).json(returnJson)
 		})
@@ -271,10 +270,10 @@ entitiesRouter.get('/', async function(req, res) {
 				return res.status(500).json(validationError);
 			}
 
-			let returnJson = { "entity_ids": [] }
+			let returnJson = { "data": [] }
 		    results.rows.forEach(row => {
 		        console.log("entity_id: " +  row.entity_id);
-		        returnJson.entity_ids.push(row.entity_id);
+		        returnJson.data.push(row.entity_id);
 		    })
 		    console.log(returnJson);
 
@@ -475,7 +474,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 							}
 							done()
 							// TODO...
-							return res.status(200).json(entity);
+							return res.status(200).json({ data: entity});
 						})
 					})
 				})
