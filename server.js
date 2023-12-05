@@ -406,6 +406,9 @@ entitiesRouter.get('/:id', async function(req, res) {
 
 				console.log(JSON.stringify(res2.rows));
 
+				if (res2.rows.length == 0) {
+					return res.status(404).json(validationError);
+				}
 				entity = {
 							"entity_id": res2.rows[0].entity_id,
 							"type": res2.rows[0].type,
