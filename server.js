@@ -296,8 +296,9 @@ entitiesRouter.post('/', function(req, res) {
 		let insertEntities = "INSERT INTO entities (namespace, entity_id, name, type) VALUES ";
 		let insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES "
 		let relationshipsCount = 0
+		let row = req.body.data
 
-	    req.body.entities.forEach(row => {
+	    // req.body.entities.forEach(row => {
 	    	insertEntities += "(" + namespace + ", '" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
 	    	row.relationships.forEach(function(item) {
 	    		relationshipsCount++
@@ -323,7 +324,7 @@ entitiesRouter.post('/', function(req, res) {
   						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + row.entity_id + "'), ";
   				}
 			});
-	    })
+	    // })
 
 	    console.log(insertEntities.substring(0, insertEntities.length - 2));
 		console.log(relationshipsCount ? insertRelationships.substring(0, insertRelationships.length - 2) : "no relationships");
@@ -502,11 +503,11 @@ entitiesRouter.put('/:id', function(req, res) {
 		let deleteRelationships = ""
 
 		// check existence of columns...
-		if (req.body.type != null) {
-			set = "type='" + req.body.type + "'";
+		if (req.body.data.type != null) {
+			set = "type='" + req.body.data.type + "'";
 		}
-		if (req.body.name != null) {
-			set += (set.length == 0 ? "" : ", ") + "name='" + req.body.name + "'";
+		if (req.body.data.name != null) {
+			set += (set.length == 0 ? "" : ", ") + "name='" + req.body.data.name + "'";
 		}
 
 		pool.connect((err, client, done) => {
@@ -533,10 +534,10 @@ entitiesRouter.put('/:id', function(req, res) {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
 
-				if (req.body.relationships != null) {
+				if (req.body.data.relationships != null) {
 					deleteRelationships = "DELETE FROM relationships WHERE namespace = " + namespace + " AND (source_entity_id='" + req.params.id + "' OR target_entity_id='" + req.params.id + "')"
 					insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES ";
-			    	req.body.relationships.forEach(function(item) {
+			    	req.body.data.relationships.forEach(function(item) {
 						if (item.length < 2) {
 							return res.status(400).json(validationError);
 						}
@@ -559,7 +560,7 @@ entitiesRouter.put('/:id', function(req, res) {
 		  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + req.params.id + "'), ";
 		  				}
 					})
-			    	if (req.body.relationships.length > 0) {
+			    	if (req.body.data.relationships.length > 0) {
 			    		insertRelationships = insertRelationships.substring(0, insertRelationships.length - 2);
 			    	} else {
 			    		insertRelationships = "SELECT";
