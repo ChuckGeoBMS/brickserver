@@ -493,9 +493,10 @@ entitiesRouter.get('/:id', async function(req, res) {
 
 // A PUT to the root of a resource should modify an object
 entitiesRouter.put('/:id', function(req, res) {
-	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	let namespace = ((typeof(req.query.namespace) !== "undefined" && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	let replaceRelationships = ((typeof(req.query.replaceRelationships) !== "undefined" && req.query.replaceRelationships === "false") ? false : true)
 
-	console.log("entitiesRouter.put(" + req.params.id + "): namespace = " + namespace);
+	console.log("entitiesRouter.put(" + req.params.id + "): namespace = " + namespace + ", replaceRelationships = " + replaceRelationships);
 	 
 	try {
 		let set = "";
@@ -535,7 +536,7 @@ entitiesRouter.put('/:id', function(req, res) {
 					return res.status(500).json(validationError);
 
 				if (req.body.data.relationships != null) {
-					deleteRelationships = "DELETE FROM relationships WHERE namespace = " + namespace + " AND (source_entity_id='" + req.params.id + "' OR target_entity_id='" + req.params.id + "')"
+					deleteRelationships = (replaceRelationships ? "DELETE FROM relationships WHERE namespace = " + namespace + " AND (source_entity_id='" + req.params.id + "' OR target_entity_id='" + req.params.id + "')" : "SELECT")
 					insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES ";
 			    	req.body.data.relationships.forEach(function(item) {
 						if (item.length < 2) {
