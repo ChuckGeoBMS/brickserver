@@ -372,7 +372,6 @@ entitiesRouter.post('/', function(req, res) {
 	}
 });
 
-
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
 	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
@@ -870,6 +869,38 @@ uploadRouter.post('/', async function(req, res) {
 	}
 });
 
-
 // Attach the routers for their respective paths
 app.use('/brickapi/v1/entities/upload', uploadRouter);
+
+// namespaces
+var namespacesRouter = express.Router();
+
+// We specify a param in our path for the GET of a specific object
+namespacesRouter.get('/', async function(req, res) {
+
+	console.log("namespacesRouter.get()");
+	 
+	try {
+		pool.query("SELECT DISTINCT namespace FROM entities", (error, results) => {
+			if (error) {
+				return res.status(500).json(validationError);
+			}
+
+			let returnJson = { "data": [] }
+		    results.rows.forEach(row => {
+		        returnJson.data.push(row.namespace);
+		    })
+		    console.log(returnJson);
+
+			return res.status(200).json(returnJson);
+		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
+});
+
+// Attach the routers for their respective paths
+app.use('/brickapi/v1/namespaces', namespacesRouter);
+
+
+
