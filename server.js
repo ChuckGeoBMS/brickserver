@@ -19,7 +19,7 @@ const inverseRelationships = {
 	"isPartOf": "hasPart",
 	"isPointOf": "hasPoint",
 	"isRegulatedBy": "regulates",
-	"isTagOf": "hasTag"
+	"isTagOf": "hasTag",
 }
 
 // const upload = multer({ dest: './uploads/' });
@@ -121,11 +121,13 @@ INSERT INTO products (product_no, name, price) VALUES
     (3, 'Milk', 2.99);
 */
 timeseriesRouter.post('/', function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"
+
+	console.log("timeseriesRouter.post(): namespace = " + namespace);
 	 
 	try {
 		let prediction = null;
-		let insert = "INSERT INTO timeseries (entity_id, time, value, prediction) VALUES ";
+		let insert = "INSERT INTO timeseries (namespace, entity_id, time, value, prediction) VALUES ";
 
 		if (req.query.prediction && req.query.prediction != "") {
 			prediction = req.query.prediction;
@@ -133,10 +135,10 @@ timeseriesRouter.post('/', function(req, res) {
 
 		let predictionString = prediction == null ? "null" : "'" + prediction + "'";
 	    req.body.data.forEach(row => {
-	    	insert += "('" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + predictionString + "), ";
+	    	insert += "(" + namespace + ", '" + row[0] + "', '" + row[1] + "', " + row[2] + ", " + predictionString + "), ";
 	    })
 
-	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_entity_id_time_prediction_key DO UPDATE SET value = EXCLUDED.value"
+	    insert = insert.substring(0, insert.length - 2) + " ON CONFLICT ON CONSTRAINT timeseries_namespace_entity_id_time_prediction_key DO UPDATE SET value = EXCLUDED.value"
 	    console.log(insert);
 
 		pool.query(insert, (error, results) => {
@@ -156,7 +158,9 @@ timeseriesRouter.post('/', function(req, res) {
 
 // We specify a param in our path for the GET of a specific object
 timeseriesRouter.get('/:id', async function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"
+
+	console.log("namespace = " + namespace);
 	 
 	try {
 		let start = "2000-01-01";
@@ -176,7 +180,7 @@ timeseriesRouter.get('/:id', async function(req, res) {
 		}
 
 		let predictionString = prediction == null ? "IS null" : "= '" + prediction + "'";
-		let queryString = "SELECT * FROM timeseries WHERE entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' AND prediction " + predictionString + " ORDER BY time";
+		let queryString = "SELECT * FROM timeseries WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "' AND time >= '" + start + "' AND time < '" + end + "' AND prediction " + predictionString + " ORDER BY time";
 
 		console.log(queryString);
 
@@ -199,7 +203,7 @@ timeseriesRouter.get('/:id', async function(req, res) {
 			    ]
 			}
 		    results.rows.forEach(row => {
-		        returnJson.data.push([ row.entity_id, row.time, row.value]);
+		        returnJson.data.push([row.entity_id, row.time, row.value]);
 		    })
 			return res.status(200).json(returnJson)
 		})
@@ -211,12 +215,12 @@ timeseriesRouter.get('/:id', async function(req, res) {
 // Delete all timeseries data
 // NOTE: not part of the Brick API!
 timeseriesRouter.delete('/', function(req, res) {
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
 	try {
-		// TODO: range...
+		// TODO: simplify, range...
 	 	let deleteString = 
-	 		"DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities WHERE namespace = " +
-	 		((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null") + 
-	 		")"
+	 		"DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities WHERE namespace = " + namespace + ")"
 
 		console.log(deleteString);	 
 
@@ -233,9 +237,11 @@ timeseriesRouter.delete('/', function(req, res) {
 
 // Delete time series data for a specific entity
 timeseriesRouter.delete('/:id', function(req, res) { 
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	
 	try {
 		// TODO: range...
-		pool.query("DELETE FROM timeseries WHERE entity_id = '" + req.params.id + "'", (error, results) => {
+		pool.query("DELETE FROM timeseries WHERE namespace = " + namespace + "AND entity_id = '" + req.params.id + "'", (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
@@ -254,18 +260,20 @@ var entitiesRouter = express.Router();
 
 // We specify a param in our path for the GET of all entitites
 entitiesRouter.get('/', async function(req, res) {
-	console.log("namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"));
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.get(): namespace = " + namespace);
 	 
 	try {
-		pool.query("SELECT entity_id FROM entities WHERE namespace=" + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null"), (error, results) => {
+		pool.query("SELECT entity_id FROM entities WHERE namespace=" + namespace, (error, results) => {
 			if (error) {
 				return res.status(500).json(validationError);
 			}
 
-			let returnJson = { "entity_ids": [] }
+			let returnJson = { "data": [] }
 		    results.rows.forEach(row => {
 		        console.log("entity_id: " +  row.entity_id);
-		        returnJson.entity_ids.push(row.entity_id);
+		        returnJson.data.push(row.entity_id);
 		    })
 		    console.log(returnJson);
 
@@ -278,40 +286,48 @@ entitiesRouter.get('/', async function(req, res) {
 
 // A POST to the root of a resource should create new objects
 entitiesRouter.post('/', function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.post(): namespace = " + namespace);
+	console.log("body = " + JSON.stringify(req.body))
 	 
 	try {
 		// let insert = "INSERT INTO entities (entity_id, name, type, relationships) VALUES ";
-		let insertEntities = "INSERT INTO entities (entity_id, name, type) VALUES ";
-		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+		let insertEntities = "INSERT INTO entities (namespace, entity_id, name, type) VALUES ";
+		let insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES "
+		let relationshipsCount = 0
+		let row = req.body.data
 
-	    req.body.entities.forEach(row => {
-			// TODO: put relationships in relationships table...
-	    	// insert += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "', '" + JSON.stringify(row.relationships) + "'), ";
-	    	insertEntities += "('" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
+	    // req.body.entities.forEach(row => {
+	    	insertEntities += "(" + namespace + ", '" + row.entity_id + "', '" + row.name + "', '" + row.type + "'), ";
 	    	row.relationships.forEach(function(item) {
-
-  				// console.log(JSON.stringify(item));
-
+	    		relationshipsCount++
   				if (item.length < 2) {
   					return res.status(400).json(validationError);
   				}
 
-  				// TODO: need to parse '#' in relationship
+  				let relationshipParts = item[0].split("#");
+
+  				if (relationshipParts.length != 2) {
+  					console.log("not a Brick Schema relationship")
+
+  					return res.status(500).json(validationError);	 						
+  				}
+
   				let relationship = item[0];
+  				let inverseRelationship = typeof(inverseRelationships[relationshipParts[1]]) === "undefined" ? null : relationshipParts[0] + "#" + inverseRelationships[relationshipParts[1]]
 
   				for (let i = 1; i < item.length; i++) {
-  					if (inverseRelationships[relationship] != null) {
-  						insertRelationships += "('" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + row.entity_id + "'), ";
-  					} else {
-  						insertRelationships += "('" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), "; 						
-  					}
+  					if (inverseRelationship === null)
+  						insertRelationships += "(" + namespace + ", '" + row.entity_id + "', '" + relationship + "', '" + item[i] + "'), ";
+  					else						
+  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + row.entity_id + "'), ";
   				}
 			});
-	    })
+	    // })
 
 	    console.log(insertEntities.substring(0, insertEntities.length - 2));
-		console.log(insertRelationships.substring(0, insertRelationships.length - 2));
+		console.log(relationshipsCount ? insertRelationships.substring(0, insertRelationships.length - 2) : "no relationships");
 
 		pool.connect((err, client, done) => {
 		  const shouldAbort = err => {
@@ -331,16 +347,10 @@ entitiesRouter.post('/', function(req, res) {
 		    if (shouldAbort(err)) 
 		    	return res.status(500).json(validationError);
 		    
-		    // const queryText = 'INSERT INTO users(name) VALUES($1) RETURNING id'
-
-		    client.query(/*queryText, ['brianc']*/ (insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
+		    client.query((insertEntities.substring(0, insertEntities.length - 2)), (err, res2) => {
 		      if (shouldAbort(err)) 
 		      	return res.status(500).json(validationError);
-
-		      // const insertPhotoText = 'INSERT INTO photos(user_id, photo_url) VALUES ($1, $2)'
-		      // const insertPhotoValues = [res.rows[0].id, 's3.bucket.foo']
-
-		      client.query(/*insertPhotoText, insertPhotoValues*/ (insertRelationships.substring(0, insertRelationships.length - 2)), (err, res2) => {
+		      client.query(relationshipsCount ? (insertRelationships.substring(0, insertRelationships.length - 2)) : "", (err, res2) => {
 		        if (shouldAbort(err)) 
 		        	return res.status(500).json(validationError);
 		        client.query('COMMIT', err => {
@@ -348,7 +358,6 @@ entitiesRouter.post('/', function(req, res) {
 		            console.error('Error committing transaction', err.stack)
 		          }
 		          done()
-		          // TODO...
 		          return res.status(200).json({ "is_success": true, "reason": "transaction committed" });
 		        })
 		      })
@@ -363,10 +372,11 @@ entitiesRouter.post('/', function(req, res) {
 	}
 });
 
-
 // We specify a param in our path for the GET of a specific object
 entitiesRouter.get('/:id', async function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+	console.log("entitiesRouter.get(id): namespace = " + namespace);
 	 
 	try {
 		pool.connect((err, client, done) => {
@@ -390,19 +400,22 @@ entitiesRouter.get('/:id', async function(req, res) {
 		  client.query('BEGIN', err => {
 		    if (shouldAbort(err)) 
 		    	return res.status(500).json(validationError);		    
-		    client.query("SELECT entity_id, type, name FROM entities WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
+		    client.query("SELECT entity_id, type, name FROM entities WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'", (err, res2) => {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
 
 				console.log(JSON.stringify(res2.rows));
 
+				if (res2.rows.length == 0) {
+					return res.status(404).json(validationError);
+				}
 				entity = {
 							"entity_id": res2.rows[0].entity_id,
 							"type": res2.rows[0].type,
 							"name": res2.rows[0].name,
 							"relationships": []
 				}
-				client.query("SELECT * FROM relationships WHERE source_entity_id='" + req.params.id + "' ORDER BY relationship", (err, res2) => {
+				client.query("SELECT * FROM relationships WHERE namespace = " + namespace + " AND source_entity_id='" + req.params.id + "' ORDER BY relationship", (err, res2) => {
 					if (shouldAbort(err)) 
 						return res.status(500).json(validationError);
 
@@ -464,7 +477,7 @@ entitiesRouter.get('/:id', async function(req, res) {
 							}
 							done()
 							// TODO...
-							return res.status(200).json(entity);
+							return res.status(200).json({ data: entity});
 						})
 					})
 				})
@@ -479,19 +492,22 @@ entitiesRouter.get('/:id', async function(req, res) {
 
 // A PUT to the root of a resource should modify an object
 entitiesRouter.put('/:id', function(req, res) {
-	console.log("namespace = " + (req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null");
+	let namespace = ((typeof(req.query.namespace) !== "undefined" && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+	let replaceRelationships = ((typeof(req.query.replaceRelationships) !== "undefined" && req.query.replaceRelationships === "false") ? false : true)
+
+	console.log("entitiesRouter.put(" + req.params.id + "): namespace = " + namespace + ", replaceRelationships = " + replaceRelationships);
 	 
 	try {
 		let set = "";
 		let insertRelationships = ""
-		let deleteId;
+		let deleteRelationships = ""
 
 		// check existence of columns...
-		if (req.body.type != null) {
-			set = "type='" + req.body.type + "'";
+		if (req.body.data.type != null) {
+			set = "type='" + req.body.data.type + "'";
 		}
-		if (req.body.name != null) {
-			set += (set.length == 0 ? "" : ", ") + "name='" + req.body.name + "'";
+		if (req.body.data.name != null) {
+			set += (set.length == 0 ? "" : ", ") + "name='" + req.body.data.name + "'";
 		}
 
 		pool.connect((err, client, done) => {
@@ -510,34 +526,41 @@ entitiesRouter.put('/:id', function(req, res) {
 		  }
 		  client.query('BEGIN', err => {
 		    if (shouldAbort(err)) 
-		    	return res.status(500).json(validationError);		    
-		    client.query("UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'", (err, res2) => {
+		    	return res.status(500).json(validationError);
+
+			console.log("executing UPDATE: " + (set == "" ? "SELECT" : "UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'"))
+
+		    client.query(set == "" ? "SELECT" : "UPDATE entities SET " + set + " WHERE namespace = " + namespace + " AND entity_id = '" + req.params.id + "'", (err, res2) => {
 				if (shouldAbort(err)) 
 					return res.status(500).json(validationError);
 
-				console.log("executed: " + "UPDATE entities SET " + set + " WHERE entity_id = '" + req.params.id + "'")
-
-				if (req.body.relationships != null) {
-					insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES ";
-			    	req.body.relationships.forEach(function(item) {
+				if (req.body.data.relationships != null) {
+					deleteRelationships = (replaceRelationships ? "DELETE FROM relationships WHERE namespace = " + namespace + " AND (source_entity_id='" + req.params.id + "' OR target_entity_id='" + req.params.id + "')" : "SELECT")
+					insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES ";
+			    	req.body.data.relationships.forEach(function(item) {
 						if (item.length < 2) {
 							return res.status(400).json(validationError);
 						}
 
-						console.log(JSON.stringify(item));
+		  				let relationshipParts = item[0].split("#");
 
-						// TODO: need to implement inverse relationship check...
-						let relationship = item[0];
+		  				if (relationshipParts.length != 2) {
+		  					console.log("not a Brick Schema relationship")
 
-						for (let i = 1; i < item.length; i++) {
-		  					if (inverseRelationships[relationship] != null) {
-		  						insertRelationships += "('" + item[i] + "', '" + inverseRelationships[relationship] + "', '" + req.params.id + "'), ";
-		  					} else {
-		  						insertRelationships += "('" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), "; 						
-		  					}
-						}
+		  					return res.status(500).json(validationError);	 						
+		  				}
+
+		  				let relationship = item[0];
+		  				let inverseRelationship = typeof(inverseRelationships[relationshipParts[1]]) === "undefined" ? null : relationshipParts[0] + "#" + inverseRelationships[relationshipParts[1]]
+
+		  				for (let i = 1; i < item.length; i++) {
+		  					if (inverseRelationship === null)
+		  						insertRelationships += "(" + namespace + ", '" + req.params.id + "', '" + relationship + "', '" + item[i] + "'), ";
+		  					else						
+		  						insertRelationships += "(" + namespace + ", '" + item[i] + "', '" + inverseRelationship + "', '" + req.params.id + "'), ";
+		  				}
 					})
-			    	if (req.body.relationships.length > 0) {
+			    	if (req.body.data.relationships.length > 0) {
 			    		insertRelationships = insertRelationships.substring(0, insertRelationships.length - 2);
 			    	} else {
 			    		insertRelationships = "SELECT";
@@ -547,21 +570,19 @@ entitiesRouter.put('/:id', function(req, res) {
 					console.log(insertRelationships);
 				} else {
 					insertRelationships = "SELECT"
-					deleteId = "e4948558-7694-455b-9021-878243c056a6"
+					deleteRelationships = "SELECT"
 				}
 
-				client.query("DELETE FROM relationships WHERE source_entity_id='" + deleteId + "'", (err, res2) => {
+				console.log("executing DELETE: " + deleteRelationships)
+				client.query(deleteRelationships, (err, res2) => {
 					if (shouldAbort(err)) 
 						return res.status(500).json(validationError);
 
-					console.log("executed: " + "DELETE FROM relationships WHERE source_entity_id='" + req.params.id + "'")
+					console.log("executing INSERT: " + insertRelationships);
 
 					client.query(insertRelationships, (err, res2) => {
 						if (shouldAbort(err)) 
 							return res.status(500).json(validationError);
-
-						console.log(" executed: " + insertRelationships);
-
 						client.query('COMMIT', err => {
 							if (err) {
 								console.error('Error committing transaction', err.stack)
@@ -587,6 +608,8 @@ entitiesRouter.put('/:id', function(req, res) {
 entitiesRouter.delete('/', function(req, res) { 
 	try {
 		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+		// TODO: simplify time series and relationship deletion
 	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
 	 	let relationshipsDeleteString = 
 	 		"DELETE from relationships WHERE " +
@@ -652,12 +675,15 @@ entitiesRouter.delete('/', function(req, res) {
 // Delete a specific entity
 entitiesRouter.delete('/:id', function(req, res) { 
 	try {
+		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+
+		// TODO: simplify time series and relationship deletion
 	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id ='" + req.params.id + "'"
 	 	let relationshipsDeleteString = 
 	 		"DELETE from relationships WHERE " +
 	 		"source_entity_id ='" + req.params.id + "'" +  " OR " +
 	 		"target_entity_id ='" + req.params.id + "'"
-	 	let entitiesDeleteString = "DELETE FROM entities WHERE entity_id = '" + req.params.id + "'"
+	 	let entitiesDeleteString = "DELETE FROM entities " + whereNamespaceString + " AND entity_id = '" + req.params.id + "'"
 
 	 	console.log(timeSeriesDeleteString)
 	 	console.log(relationshipsDeleteString)
@@ -720,7 +746,8 @@ var uploadRouter = express.Router();
 
 uploadRouter.post('/', async function(req, res) {
 	try {
-		let whereNamespaceString = "WHERE namespace = " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+		let namespace = ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null")
+		let whereNamespaceString = "WHERE namespace = " + namespace
 	 	let timeSeriesDeleteString = "DELETE FROM timeseries WHERE entity_id IN (SELECT entity_id FROM entities " + whereNamespaceString + ")"
 	 	let relationshipsDeleteString = 
 	 		"DELETE from relationships WHERE " +
@@ -735,8 +762,8 @@ uploadRouter.post('/', async function(req, res) {
 		const parser = new N3.Parser();
 		const store = new N3.Store();
 
-		let insertEntities = "INSERT INTO entities (entity_id, name, type, namespace) VALUES ";
-		let insertRelationships = "INSERT INTO relationships (source_entity_id, relationship, target_entity_id) VALUES "
+		let insertEntities = "INSERT INTO entities (namespace, entity_id, name, type) VALUES ";
+		let insertRelationships = "INSERT INTO relationships (namespace, source_entity_id, relationship, target_entity_id) VALUES "
 		let name2uuid = {};
 		let uuid;
 
@@ -754,7 +781,7 @@ uploadRouter.post('/', async function(req, res) {
 
 	      			// console.log(JSON.stringify(quad));
 	      			uuid = uuidv4();
-					insertEntities += "('" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "', " + ((req.query.namespace && req.query.namespace != "") ? ("'" + req.query.namespace + "'") : "null") + "), ";
+					insertEntities += "(" + namespace + ", '" + uuid + "', '" + quad.subject.value + "', '" + quad.object.value + "'), ";
 	      			name2uuid[quad.subject.value] = uuid;
 	      		});
 
@@ -766,9 +793,9 @@ uploadRouter.post('/', async function(req, res) {
 	      				let relationship = quad.predicate.value.split('#');
 
 	  					if (inverseRelationships[relationship[1]] == null) {
-	  						insertRelationships += "('" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
+	  						insertRelationships += "(" + namespace + ", '" + name2uuid[quad.subject.value] + "', '" + quad.predicate.value + "', '" + name2uuid[quad.object.value] + "'), "; 						
 	  					} else {
-	  						insertRelationships += "('" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
+	  						insertRelationships += "(" + namespace + ", '" + name2uuid[quad.object.value] + "', '" + relationship[0] + "#" + inverseRelationships[relationship[1]] + "', '" + name2uuid[quad.subject.value] + "'), ";		
 	  					}	      				
 	      			}
 	      		});
@@ -842,6 +869,38 @@ uploadRouter.post('/', async function(req, res) {
 	}
 });
 
-
 // Attach the routers for their respective paths
 app.use('/brickapi/v1/entities/upload', uploadRouter);
+
+// namespaces
+var namespacesRouter = express.Router();
+
+// We specify a param in our path for the GET of a specific object
+namespacesRouter.get('/', async function(req, res) {
+
+	console.log("namespacesRouter.get()");
+	 
+	try {
+		pool.query("SELECT DISTINCT namespace FROM entities", (error, results) => {
+			if (error) {
+				return res.status(500).json(validationError);
+			}
+
+			let returnJson = { "data": [] }
+		    results.rows.forEach(row => {
+		        returnJson.data.push(row.namespace);
+		    })
+		    console.log(returnJson);
+
+			return res.status(200).json(returnJson);
+		})
+	} catch (e) {
+		return res.status(500).json(validationError);		
+	}
+});
+
+// Attach the routers for their respective paths
+app.use('/brickapi/v1/namespaces', namespacesRouter);
+
+
+
